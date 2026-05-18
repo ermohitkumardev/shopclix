@@ -191,6 +191,36 @@ export class WalletService {
     );
   }
 
+  private getEthereumProviders(): any[] {
+    if (typeof window === 'undefined') return [];
+    const ethereum = (window as any).ethereum;
+    if (!ethereum) return [];
+    if (Array.isArray(ethereum.providers) && ethereum.providers.length > 0) {
+      return ethereum.providers;
+    }
+    return [ethereum];
+  }
+
+  private getInAppWalletName(): 'SafePal' | 'Trust Wallet' | 'MetaMask' | null {
+    if (typeof navigator === 'undefined') return null;
+    const ua = navigator.userAgent || '';
+    if (/SafePal/i.test(ua)) return 'SafePal';
+    if (/Trust|TrustWallet/i.test(ua)) return 'Trust Wallet';
+    if (/MetaMask/i.test(ua)) return 'MetaMask';
+    return null;
+  }
+
+  private findProviderByWalletName(walletName: 'SafePal' | 'Trust Wallet' | 'MetaMask'): any | null {
+    const providers = this.getEthereumProviders();
+    if (walletName === 'SafePal') {
+      return providers.find((provider) => provider?.isSafePal) || null;
+    }
+    if (walletName === 'Trust Wallet') {
+      return providers.find((provider) => provider?.isTrust || provider?.isTrustWallet) || null;
+    }
+    return providers.find((provider) => provider?.isMetaMask && !provider?.isSafePal && !provider?.isTrust && !provider?.isTrustWallet) || null;
+  }
+
   // Get USDT contract address from settings
   private getUSDTContractAddress(): string {
     if (!this.adminSettings?.usdtAddress) {
@@ -226,53 +256,71 @@ export class WalletService {
       return wallets;
     }
 
-    // MetaMask
-    if (window.ethereum?.isMetaMask) {
+    const inAppWalletName = this.getInAppWalletName();
+    if (inAppWalletName) {
+      const provider = this.findProviderByWalletName(inAppWalletName) || (window as any).ethereum;
+      const icon = inAppWalletName === 'MetaMask' ? '🦊' : inAppWalletName === 'Trust Wallet' ? '🔷' : '🛡️';
       wallets.push({
-        name: 'MetaMask',
-        icon: '🦊',
+        name: inAppWalletName,
+        icon,
         isInstalled: true,
-        provider: window.ethereum,
+        provider,
       });
+      console.log(`Detected ${wallets.length} wallet(s):`, wallets.map(w => w.name));
+      return wallets;
     }
 
-    // Trust Wallet
-    if (window.ethereum?.isTrust) {
-      wallets.push({
-        name: 'Trust Wallet',
-        icon: '🔷',
-        isInstalled: true,
-        provider: window.ethereum,
-      });
-    }
+    const providers = this.getEthereumProviders();
+    const safePalProvider = providers.find((provider) => provider?.isSafePal);
+    const trustProvider = providers.find((provider) => provider?.isTrust || provider?.isTrustWallet);
+    const metaMaskProvider = providers.find((provider) =>
+      provider?.isMetaMask && !provider?.isSafePal && !provider?.isTrust && !provider?.isTrustWallet
+    );
 
-    // SafePal
-    if (window.ethereum?.isSafePal) {
+    if (safePalProvider) {
       wallets.push({
         name: 'SafePal',
         icon: '🛡️',
         isInstalled: true,
-        provider: window.ethereum,
+        provider: safePalProvider,
+      });
+    }
+
+    if (trustProvider && trustProvider !== safePalProvider) {
+      wallets.push({
+        name: 'Trust Wallet',
+        icon: '🔷',
+        isInstalled: true,
+        provider: trustProvider,
+      });
+    }
+
+    if (metaMaskProvider && metaMaskProvider !== safePalProvider && metaMaskProvider !== trustProvider) {
+      wallets.push({
+        name: 'MetaMask',
+        icon: '🦊',
+        isInstalled: true,
+        provider: metaMaskProvider,
       });
     }
 
     // Binance Chain Wallet
-    if (window.BinanceChain) {
+    if ((window as any).BinanceChain) {
       wallets.push({
         name: 'Binance Chain Wallet',
         icon: '🟡',
         isInstalled: true,
-        provider: window.BinanceChain,
+        provider: (window as any).BinanceChain,
       });
     }
 
     // Generic Web3 wallet (if no specific wallet detected but ethereum exists)
-    if (window.ethereum && wallets.length === 0) {
+    if ((window as any).ethereum && wallets.length === 0) {
       wallets.push({
         name: 'Web3 Wallet',
         icon: '🔗',
         isInstalled: true,
-        provider: window.ethereum,
+        provider: (window as any).ethereum,
       });
     }
 
@@ -916,9 +964,9 @@ export class WalletService {
 
   // Get wallet name from provider
   private getWalletName(provider: any): string {
-    if (provider.isMetaMask) return 'MetaMask';
-    if (provider.isTrust) return 'Trust Wallet';
     if (provider.isSafePal) return 'SafePal';
+    if (provider.isTrust || provider.isTrustWallet) return 'Trust Wallet';
+    if (provider.isMetaMask) return 'MetaMask';
     if (provider.isBinanceChain || provider.isBinance) return 'Binance Chain Wallet';
     return 'Web3 Wallet';
   }

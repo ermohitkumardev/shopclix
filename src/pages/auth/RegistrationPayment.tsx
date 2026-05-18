@@ -601,13 +601,13 @@ const RegistrationPayment: React.FC = () => {
 		      setWalletState(wallet);
 
 	      if (wallet.address) {
-	        const walletType = provider.isMetaMask
-	          ? 'metamask'
-	          : provider.isTrust
-            ? 'trust'
-            : provider.isSafePal
-              ? 'safepal'
-              : 'web3';
+	        const walletType = provider.isSafePal
+            ? 'safepal'
+            : (provider.isTrust || provider.isTrustWallet)
+              ? 'trust'
+              : provider.isMetaMask
+                ? 'metamask'
+                : 'web3';
 
 	        // Best-effort: don't fail wallet connection if this transiently fails (502 etc).
 	        void saveWalletConnection(
