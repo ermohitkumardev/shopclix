@@ -804,6 +804,34 @@ const CustomerDetails: React.FC<{
         mobile_verified: customer.tu_mobile_verified
     });
     const notification = useNotification();
+    const hasProfile = Boolean(customer.tbl_user_profiles?.tup_sponsorship_number);
+    const verificationComplete = customer.verification_complete ?? (customer.tu_email_verified || customer.tu_mobile_verified);
+    const isActiveMember =
+        customer.is_active_member ??
+        (customer.tu_is_active && customer.tu_registration_paid === true && verificationComplete);
+    const statusBadge = !customer.tu_is_active
+        ? {
+            label: 'Inactive',
+            className: 'bg-red-100 text-red-800',
+            icon: <AlertCircle className="h-4 w-4 mr-1" />
+        }
+        : !hasProfile
+            ? {
+                label: 'Incomplete',
+                className: 'bg-amber-100 text-amber-800',
+                icon: <AlertCircle className="h-4 w-4 mr-1" />
+            }
+            : isActiveMember
+                ? {
+                    label: 'Active',
+                    className: 'bg-green-100 text-green-800',
+                    icon: <CheckCircle className="h-4 w-4 mr-1" />
+                }
+                : {
+                    label: 'Pending',
+                    className: 'bg-yellow-100 text-yellow-800',
+                    icon: <AlertCircle className="h-4 w-4 mr-1" />
+                };
 
     useEffect(() => {
         if (activeTab === 'transactions') {
@@ -1150,12 +1178,9 @@ const CustomerDetails: React.FC<{
                                                 <option value="inactive">Inactive</option>
                                             </select>
                                         ) : (
-                                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium mt-1 ${customer.tu_is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                                                {customer.tu_is_active ? (
-                                                    <><CheckCircle className="h-4 w-4 mr-1" />Active</>
-                                                ) : (
-                                                    <><AlertCircle className="h-4 w-4 mr-1" />Inactive</>
-                                                )}
+                                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium mt-1 ${statusBadge.className}`}>
+                                                {statusBadge.icon}
+                                                {statusBadge.label}
                                             </span>
                                         )}
                                     </div>

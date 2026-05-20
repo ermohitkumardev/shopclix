@@ -346,6 +346,9 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS public.get_mlm_level_counts_for_sponsors_at_level(int, text[]);
+DROP FUNCTION IF EXISTS public.get_mlm_level_counts_for_sponsors_at_level(text[], int);
+
 CREATE OR REPLACE FUNCTION public.get_mlm_level_counts_for_sponsors_at_level(
   p_sponsorship_numbers text[],
   p_level int
@@ -386,22 +389,6 @@ LEFT JOIN public.tbl_referral_closure c
 LEFT JOIN public.tbl_users u
   ON u.tu_id = c.trc_descendant_user_id
 GROUP BY sponsors.sponsorship_number
-$sql$;
-
-CREATE OR REPLACE FUNCTION public.get_mlm_level_counts_for_sponsors_at_level(
-  p_level int,
-  p_sponsorship_numbers text[]
-)
-RETURNS TABLE (
-  sponsorship_number text,
-  level_count int
-)
-SECURITY DEFINER
-SET search_path = public
-LANGUAGE sql
-AS $sql$
-SELECT sponsorship_number, level_count
-FROM public.get_mlm_level_counts_for_sponsors_at_level(p_sponsorship_numbers, p_level)
 $sql$;
 
 CREATE OR REPLACE FUNCTION public.get_upline_sponsorships(
@@ -650,11 +637,9 @@ GRANT EXECUTE ON FUNCTION public.rebuild_referral_closure() TO authenticated, se
 GRANT EXECUTE ON FUNCTION public.upsert_mlm_level_counts(text) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.recompute_all_mlm_level_counts() TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.get_mlm_level_counts_for_sponsors_at_level(text[], int) TO authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.get_mlm_level_counts_for_sponsors_at_level(int, text[]) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.get_upline_sponsorships(text, integer) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.get_referral_network_v1(uuid, int) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.get_referral_network_page_v1(uuid, int, int, text, int, int) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.get_referral_network_stats_v1(uuid, int) TO authenticated, service_role;
 
 SELECT public.recompute_all_mlm_level_counts();
-
