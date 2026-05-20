@@ -610,7 +610,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email: userData.email,
         password: userData.password,
         options: {
-          emailRedirectTo: undefined // Disable email confirmation for demo
+          emailRedirectTo: undefined, // Disable email confirmation for demo
+          data: userType === 'customer'
+            ? {
+              user_type: 'customer',
+              first_name: userData.firstName,
+              last_name: userData.lastName,
+              username: userData.userName,
+              mobile: userData.mobile,
+              gender: userData.gender,
+              parent_account: userData.parentAccount
+            }
+            : {
+              user_type: userType
+            }
         }
       });
 
@@ -635,26 +648,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Use the appropriate registration function based on user type
       if (userType === 'customer') {
-        console.log('📝 Registering customer profile...');
-        const { data, error: regError } = await supabase.rpc('register_customer', {
-          p_user_id: authData.user.id,
-          p_email: userData.email,
-          p_first_name: userData.firstName,
-          p_last_name: userData.lastName,
-          p_username: userData.userName,
-          p_mobile: userData.mobile,
-          p_gender: userData.gender,
-          p_parent_account: userData.parentAccount,
-        });
-
-        console.log('user profile data: ', data);
-
-        if (regError) {
-          console.error('Customer registration error:', regError);
-          throw new Error(regError.message);
-        }
-
-        // Direct parent relationship only (no MLM tree placement)
+        console.log('✅ Customer profile created by auth signup trigger');
 
       } else if (userType === 'company') {
         console.log('📝 Registering company profile...');
