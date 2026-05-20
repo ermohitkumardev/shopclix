@@ -143,8 +143,11 @@ Deno.serve(async (req: Request) => {
     const levelFilter = Number.isFinite(Number(levelFilterRaw)) && Number(levelFilterRaw) > 0
       ? Number(levelFilterRaw)
       : null;
-    const offset = Number.isFinite(Number(body.offset)) ? Number(body.offset) : 0;
-    const limit = Number.isFinite(Number(body.limit)) ? Number(body.limit) : 10;
+    const offset = Math.max(0, Number.isFinite(Number(body.offset)) ? Math.floor(Number(body.offset)) : 0);
+    const limit = Math.min(
+      100,
+      Math.max(1, Number.isFinite(Number(body.limit)) ? Math.floor(Number(body.limit)) : 10)
+    );
 
     if (parentAccount) {
       // Downline mode: find sponsor by sponsorship number or UUID, then list descendants with levels.
@@ -235,6 +238,7 @@ Deno.serve(async (req: Request) => {
           visitedUserIds.add(childUserId);
           downline.push({ userId: childUserId, level });
           nextParents.push(childSponsorship);
+          if (downline.length >= maxNodes) break;
         }
 
         if (downline.length >= maxNodes) break;

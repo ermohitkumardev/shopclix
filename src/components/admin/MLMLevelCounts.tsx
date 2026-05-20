@@ -57,28 +57,6 @@ const MLMLevelCounts: React.FC = () => {
     }
   };
 
-  const recomputeCounts = async () => {
-    if (!confirm('Recompute level counts for all sponsors? This can take time on large datasets.')) return;
-    setLoading(true);
-    try {
-      const offset = (page - 1) * pageSize;
-      const data = await adminApi.post<LevelCountRow[]>('admin-get-earning-level-counts', {
-        recompute: true,
-        searchTerm: searchTerm.trim() || null,
-        accountScope,
-        offset,
-        limit: pageSize,
-        extraLevel,
-      });
-      setRows(data || []);
-      notification.showSuccess('Recomputed', 'Level counts recomputed successfully');
-    } catch (error: any) {
-      notification.showError('Recompute Failed', error.message || 'Failed to recompute level counts');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const awardMilestoneRewards = async (sponsorshipNumber: string) => {
     const sponsor = String(sponsorshipNumber || '').trim();
     if (!sponsor) return;
@@ -146,14 +124,6 @@ const MLMLevelCounts: React.FC = () => {
           <p className="text-sm text-gray-600">Paginated MLM level counts for sponsors</p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={recomputeCounts}
-            className="flex items-center space-x-2 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100"
-            disabled={loading}
-          >
-            <RefreshCw className="h-4 w-4" />
-            <span>Recompute</span>
-          </button>
           <button
             onClick={loadCounts}
             className="flex items-center space-x-2 px-3 py-2 bg-gray-50 text-gray-700 rounded-lg hover:bg-gray-100"

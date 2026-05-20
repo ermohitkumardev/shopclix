@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { useMLM } from '../../contexts/MLMContext';
 import { useAdmin } from '../../contexts/AdminContext';
-import { supabase } from '../../lib/supabase';
+import { getReferralNetworkStats, supabase } from '../../lib/supabase';
 import ReferralLinkGenerator from '../../components/mlm/ReferralLinkGenerator';
 import TransactionsDashboard from '../../components/customer/TransactionsDashboard';
 import DailyTasksDashboard from '../../components/customer/DailyTasksDashboard';
@@ -84,7 +83,6 @@ type EarningsRow = {
 const CustomerDashboard: React.FC = () => {
   const { user } = useAuth();
   const notification = useNotification();
-  const { treeData, loadTreeData } = useMLM();
   const { settings } = useAdmin();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
@@ -178,13 +176,13 @@ const CustomerDashboard: React.FC = () => {
     try {
       console.log('📊 Loading tree stats...');
 
-      const nodes = (treeData && treeData.length > 0) ? treeData : await loadTreeData(user.id);
-      console.log('✅ Tree data loaded:', nodes.length, 'nodes');
+      const stats = await getReferralNetworkStats(user.id);
+      console.log('✅ Tree stats loaded:', stats);
 
-      const totalTeam = nodes.length;
-      const totalDirectReferrals = nodes.filter(n => n.level === 1).length;
-      const activeDirectReferrals = nodes.filter(n => n.level === 1 && n.isActive).length;
-      const activeTeam = nodes.filter(n => n.isActive).length;
+      const totalTeam = Number(stats?.total_team || 0);
+      const totalDirectReferrals = Number(stats?.total_direct_referrals || 0);
+      const activeDirectReferrals = Number(stats?.active_direct_referrals || 0);
+      const activeTeam = Number(stats?.active_team || 0);
 
       setDashboardStats(prev => ({
         ...prev,

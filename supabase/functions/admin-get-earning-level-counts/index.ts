@@ -62,14 +62,22 @@ Deno.serve(async (req: Request) => {
     const body = await req.json().catch(() => ({}));
     const recompute = body?.recompute === true;
     if (recompute) {
-      // Rebuild counts to ensure the admin sees up-to-date and consistent results.
-      await supabase.rpc('recompute_all_mlm_level_counts');
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Full recompute must run as a controlled database maintenance job, not from the admin UI.',
+        }),
+        {
+          status: 409,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
 
     const searchTerm = typeof body?.searchTerm === 'string' ? body.searchTerm.trim() : '';
-    const offset = Number.isFinite(Number(body?.offset)) ? Number(body.offset) : 0;
-    const limitRaw = Number.isFinite(Number(body?.limit)) ? Number(body.limit) : 25;
-    const limit = Math.min(200, Math.max(1, limitRaw));
+    const offset = Math.max(0, Number.isFinite(Number(body?.offset)) ? Math.floor(Number(body.offset)) : 0);
+    const limitRaw = Number.isFinite(Number(body?.limit)) ? Math.floor(Number(body.limit)) : 25;
+    const limit = Math.min(100, Math.max(1, limitRaw));
     const extraLevelRaw = body?.extraLevel;
     const extraLevel = Number.isFinite(Number(extraLevelRaw)) ? Number(extraLevelRaw) : null;
     const requestedExtraLevel = extraLevel && extraLevel >= 1 && extraLevel <= 50 ? extraLevel : null;

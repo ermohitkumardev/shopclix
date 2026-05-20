@@ -578,6 +578,25 @@ export const getReferralNetworkPage = async (params: {
   }
 };
 
+export const getReferralNetworkStats = async (userId: string, maxLevels: number = 100) => {
+  try {
+    const { data, error } = await supabase.rpc('get_referral_network_stats_v1', {
+      p_user_id: userId,
+      p_max_levels: maxLevels
+    });
+
+    if (error) {
+      console.warn('Failed to get referral network stats:', error);
+      return null;
+    }
+
+    return Array.isArray(data) ? data[0] : data;
+  } catch (error) {
+    console.warn('Failed to get referral network stats:', error);
+    return null;
+  }
+};
+
 export const checkSponsorshipNumberExists = async (sponsorshipNumber: string) => {
   try {
     const { data, error } = await supabase
