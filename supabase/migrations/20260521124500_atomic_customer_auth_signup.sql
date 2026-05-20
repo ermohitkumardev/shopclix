@@ -11,6 +11,35 @@
   tbl_user_profiles inside the same auth user insert transaction.
 */
 
+CREATE OR REPLACE FUNCTION public.generate_unique_sponsorship_number()
+RETURNS text
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_code text;
+  v_try int := 0;
+BEGIN
+  LOOP
+    v_try := v_try + 1;
+    v_code := 'SP' || lpad((floor(random() * 100000000))::int::text, 8, '0');
+
+    IF NOT EXISTS (
+      SELECT 1
+      FROM public.tbl_user_profiles
+      WHERE lower(btrim(tup_sponsorship_number)) = lower(btrim(v_code))
+    ) THEN
+      RETURN v_code;
+    END IF;
+
+    IF v_try > 200 THEN
+      RAISE EXCEPTION 'Could not generate unique sponsorship number after % attempts', v_try;
+    END IF;
+  END LOOP;
+END;
+$$;
+
 CREATE OR REPLACE FUNCTION public.handle_customer_auth_signup()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -47,8 +76,19 @@ BEGIN
   SELECT sponsor_profile.tup_user_id
   INTO v_sponsor_id
   FROM public.tbl_user_profiles sponsor_profile
-  WHERE public.normalize_sponsorship_key(sponsor_profile.tup_sponsorship_number)
-    = public.normalize_sponsorship_key(v_parent_account)
+  WHERE (
+    CASE
+      WHEN lower(btrim(sponsor_profile.tup_sponsorship_number)) LIKE 'sp%'
+        THEN substr(lower(btrim(sponsor_profile.tup_sponsorship_number)), 3)
+      ELSE lower(btrim(sponsor_profile.tup_sponsorship_number))
+    END
+  ) = (
+    CASE
+      WHEN lower(btrim(v_parent_account)) LIKE 'sp%'
+        THEN substr(lower(btrim(v_parent_account)), 3)
+      ELSE lower(btrim(v_parent_account))
+    END
+  )
   LIMIT 1;
 
   IF v_sponsor_id IS NULL THEN
@@ -133,6 +173,26 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION public.get_default_parent_sponsorship_number()
+RETURNS text
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+SELECT p.tup_sponsorship_number
+FROM public.tbl_user_profiles p
+JOIN public.tbl_users u
+  ON u.tu_id = p.tup_user_id
+WHERE p.tup_is_default_parent = true
+  AND NULLIF(btrim(p.tup_sponsorship_number), '') IS NOT NULL
+  AND COALESCE(u.tu_is_active, false)
+  AND COALESCE(u.tu_registration_paid, false)
+  AND (COALESCE(u.tu_email_verified, false) OR COALESCE(u.tu_mobile_verified, false))
+ORDER BY p.tup_created_at ASC NULLS LAST
+LIMIT 1
+$$;
+
 DROP TRIGGER IF EXISTS trigger_customer_auth_signup ON auth.users;
 CREATE TRIGGER trigger_customer_auth_signup
   AFTER INSERT ON auth.users
@@ -140,3 +200,5 @@ CREATE TRIGGER trigger_customer_auth_signup
   EXECUTE FUNCTION public.handle_customer_auth_signup();
 
 GRANT EXECUTE ON FUNCTION public.handle_customer_auth_signup() TO service_role;
+GRANT EXECUTE ON FUNCTION public.generate_unique_sponsorship_number() TO authenticated, anon, service_role;
+GRANT EXECUTE ON FUNCTION public.get_default_parent_sponsorship_number() TO authenticated, anon, service_role;

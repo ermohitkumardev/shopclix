@@ -874,9 +874,11 @@ const CustomerRegister: React.FC = () => {
     }
 
     // Validate referral code if provided
-    if (formData.parentAccount) {
-      try {
-        const sponsor = await getSponsorStatusBySponsorshipNumber(formData.parentAccount);
+      let finalParentAccount = formData.parentAccount.trim();
+
+      if (finalParentAccount) {
+        try {
+        const sponsor = await getSponsorStatusBySponsorshipNumber(finalParentAccount);
         if (!sponsor) {
           setError('Invalid referral code. Please check and try again.');
           return;
@@ -903,6 +905,18 @@ const CustomerRegister: React.FC = () => {
     } else if(settings.referralMandatory) {
       setError('Referral code is required');
       return;
+    } else {
+      const { data: defaultParent, error: defaultParentError } = await supabase.rpc('get_default_parent_sponsorship_number');
+      if (defaultParentError) {
+        setError('Unable to resolve default parent account. Please enter a referral code or try again.');
+        return;
+      }
+
+      finalParentAccount = String(defaultParent || '').trim();
+      if (!finalParentAccount) {
+        setError('Default parent account is not configured. Please enter a referral code.');
+        return;
+      }
     }
 
     setError('');
@@ -970,7 +984,8 @@ const CustomerRegister: React.FC = () => {
         ...formData,
         userName: finalUsername,
         email: finalEmail,
-        mobile: fullMobile
+        mobile: fullMobile,
+        parentAccount: finalParentAccount
       }, 'customer');
 
 	      // Determine verification requirements
