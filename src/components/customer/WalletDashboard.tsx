@@ -167,12 +167,26 @@ const WalletDashboard: React.FC = () => {
 
   useEffect(() => {
     if (user?.id) {
+      setWallet(null);
+      setTransactions([]);
+      setDailyTasks([]);
+      setWithdrawalRequests([]);
+      setDefaultWallet(null);
+      setLoading(true);
       loadWalletData();
       loadTransactions();
       loadDailyTasks();
       loadWithdrawalSettings();
       loadWithdrawalRequests();
       loadDefaultWallet();
+    } else {
+      setWallet(null);
+      setTransactions([]);
+      setDailyTasks([]);
+      setWithdrawalRequests([]);
+      setDefaultWallet(null);
+      setLoading(false);
+      setWithdrawalsLoading(false);
     }
   }, [user?.id]);
 

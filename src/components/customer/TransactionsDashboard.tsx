@@ -51,8 +51,15 @@ const TransactionsDashboard: React.FC = () => {
 
     useEffect(() => {
         if (user?.id) {
+            setWalletBalance(0);
+            setWalletReservedBalance(0);
+            setPendingWithdrawalTotal(0);
             loadWalletBalance();
             loadPendingWithdrawals();
+        } else {
+            setWalletBalance(0);
+            setWalletReservedBalance(0);
+            setPendingWithdrawalTotal(0);
         }
     }, [user?.id]);
 
@@ -141,7 +148,15 @@ const TransactionsDashboard: React.FC = () => {
     }, [dateFrom, dateTo, pageSize]);
 
     useEffect(() => {
-        if (!user?.id) return;
+        if (!user?.id) {
+            setTransactions([]);
+            setTotalCount(0);
+            setLoading(false);
+            setRefreshing(false);
+            return;
+        }
+        setTransactions([]);
+        setTotalCount(0);
         setLoading(true);
         loadTransactions();
         // eslint-disable-next-line react-hooks/exhaustive-deps

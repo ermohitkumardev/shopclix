@@ -41,6 +41,11 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       refreshWallet();
       refreshTransactions();
       refreshDailyTasks();
+    } else {
+      setWallet(null);
+      setTransactions([]);
+      setDailyTasks([]);
+      setLoading(false);
     }
   }, [user?.id]);
 

@@ -36,9 +36,21 @@ const EarningsDashboard: React.FC = () => {
 
   useEffect(() => {
     if (user?.id) {
+      setTransactions([]);
+      setWalletBalance(0);
+      setWalletReservedBalance(0);
+      setReservedWithdrawals(0);
+      setLoading(true);
       loadTransactions();
       loadWalletBalance();
       loadReservedWithdrawals();
+    } else {
+      setTransactions([]);
+      setWalletBalance(0);
+      setWalletReservedBalance(0);
+      setReservedWithdrawals(0);
+      setLoading(false);
+      setRefreshing(false);
     }
   }, [user?.id]);
 

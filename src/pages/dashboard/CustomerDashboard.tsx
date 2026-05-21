@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAdmin } from '../../contexts/AdminContext';
@@ -98,6 +98,11 @@ const CustomerDashboard: React.FC = () => {
   const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+  const currentUserIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    currentUserIdRef.current = user?.id || null;
+  }, [user?.id]);
 
   // Navigation items
   const navigationItems = [
@@ -120,19 +125,30 @@ const CustomerDashboard: React.FC = () => {
 
     const loadDashboardData = async () => {
       if (!user?.id) {
+        setDashboardStats({
+          totalTeam: 0,
+          totalDirectReferrals: 0,
+          activeDirectReferrals: 0,
+          activeTeam: 0,
+          totalEarnings: 0,
+          achievementPoints: 0,
+        });
+        setRecentActivities([]);
+        setInitialLoadComplete(false);
         setLoading(false);
         return;
       }
 
+      const userId = user.id;
       setLoading(true);
       console.log('🔄 Loading dashboard data for user:', user.id);
 
       try {
         // Load data in parallel with timeout
         const loadPromises = [
-          loadTreeStats(),
-          loadRecentActivities(),
-          loadEarningsStats(),
+          loadTreeStats(userId),
+          loadRecentActivities(userId),
+          loadEarningsStats(userId),
           // Earnings handled in Earnings tab
         ];
 
@@ -170,14 +186,14 @@ const CustomerDashboard: React.FC = () => {
     };
   }, [user?.id]);
 
-  const loadTreeStats = async () => {
-    if (!user?.id) return;
-
+  const loadTreeStats = async (userId: string) => {
     try {
       console.log('📊 Loading tree stats...');
 
-      const stats = await getReferralNetworkStats(user.id);
+      const stats = await getReferralNetworkStats(userId);
       console.log('✅ Tree stats loaded:', stats);
+
+      if (currentUserIdRef.current !== userId) return;
 
       const totalTeam = Number(stats?.total_team || 0);
       const totalDirectReferrals = Number(stats?.total_direct_referrals || 0);
@@ -197,26 +213,21 @@ const CustomerDashboard: React.FC = () => {
     }
   };
 
-  const loadRecentActivities = async () => {
+  const loadRecentActivities = async (userId: string) => {
     try {
       console.log('📋 Loading recent activities...');
-
-      if (!user?.id) {
-        setRecentActivities([]);
-        return;
-      }
 
       const [txRes, wdRes] = await Promise.all([
         supabase
           .from('tbl_wallet_transactions')
           .select('twt_id, twt_transaction_type, twt_amount, twt_currency, twt_description, twt_reference_type, twt_status, twt_created_at')
-          .eq('twt_user_id', user.id)
+          .eq('twt_user_id', userId)
           .order('twt_created_at', { ascending: false })
           .limit(10),
         supabase
           .from('tbl_withdrawal_requests')
           .select('twr_id, twr_amount, twr_status, twr_requested_at, twr_processed_at, twr_failure_reason')
-          .eq('twr_user_id', user.id)
+          .eq('twr_user_id', userId)
           .order('twr_requested_at', { ascending: false })
           .limit(10)
       ]);
@@ -268,20 +279,21 @@ const CustomerDashboard: React.FC = () => {
         .sort((a, b) => String(b.timestamp).localeCompare(String(a.timestamp)))
         .slice(0, 6);
 
-      setRecentActivities(merged);
+      if (currentUserIdRef.current === userId) {
+        setRecentActivities(merged);
+      }
       console.log('✅ Recent activities loaded');
     } catch (error) {
       console.error('❌ Failed to load recent activities:', error);
     }
   };
 
-  const loadEarningsStats = async () => {
-    if (!user?.id) return;
+  const loadEarningsStats = async (userId: string) => {
     try {
       const { data, error } = await supabase
         .from('tbl_wallet_transactions')
         .select('twt_amount, twt_transaction_type, twt_status, twt_created_at')
-        .eq('twt_user_id', user.id)
+        .eq('twt_user_id', userId)
         .eq('twt_currency', 'USDT')
         .eq('twt_status', 'completed')
         .limit(5000);
@@ -292,10 +304,12 @@ const CustomerDashboard: React.FC = () => {
         .filter((row) => row.twt_transaction_type === 'credit')
         .reduce((sum, row) => sum + Number(row.twt_amount || 0), 0);
 
-      setDashboardStats((prev) => ({
-        ...prev,
-        totalEarnings: Number(totalCredits.toFixed(2))
-      }));
+      if (currentUserIdRef.current === userId) {
+        setDashboardStats((prev) => ({
+          ...prev,
+          totalEarnings: Number(totalCredits.toFixed(2))
+        }));
+      }
     } catch (error) {
       console.error('❌ Failed to load earnings stats:', error);
     }

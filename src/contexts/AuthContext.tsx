@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { supabase, supabaseBatch, sessionManager } from '../lib/supabase';
 import { adminSessionManager } from '../lib/adminSupabase';
 import { OTPService, verifyOTPAPI } from '../services/otpService';
@@ -51,6 +51,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [userDataLoading, setUserDataLoading] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [otpService] = useState(() => OTPService.getInstance());
+  const userLoadSequenceRef = useRef(0);
   const notification = useNotification();
   const withTimeout = useCallback(async <T,>(promise: Promise<T>, ms: number, label: string): Promise<T> => {
     let timeoutId: number | undefined;
@@ -72,6 +73,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
+    const loadSequence = ++userLoadSequenceRef.current;
     setUserDataLoading(true);
 
     try {
@@ -155,6 +157,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Get current session to get email
       const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user || session.user.id !== userId || loadSequence !== userLoadSequenceRef.current) {
+        console.warn('Ignoring stale user data response:', {
+          requestedUserId: userId,
+          sessionUserId: session?.user?.id,
+          loadSequence,
+          currentSequence: userLoadSequenceRef.current
+        });
+        return;
+      }
 
       // Ensure we have at least minimal user data
       if (!userData && !profileData) {
@@ -192,17 +203,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Mark session as customer type when user data is loaded
       sessionStorage.setItem('session_type', 'customer');
-      setUser(user);
+      if (loadSequence === userLoadSequenceRef.current) {
+        setUser(user);
+      }
     } catch (error) {
       console.error('❌ Error fetching user data:', error);
       // Non-fatal: keep existing user state to avoid auth flicker/redirect loops.
-      setUser((prev) => {
-        if (!prev) return null;
-        if (prev.id && prev.id !== userId) return null;
-        return prev;
-      });
+      if (loadSequence === userLoadSequenceRef.current) {
+        setUser((prev) => {
+          if (!prev) return null;
+          if (prev.id && prev.id !== userId) return null;
+          return prev;
+        });
+      }
     } finally {
-      setUserDataLoading(false);
+      if (loadSequence === userLoadSequenceRef.current) {
+        setUserDataLoading(false);
+      }
     }
   }, []);
 
@@ -216,6 +233,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [fetchUserData, withTimeout]);
 
   const logout = useCallback(() => {
+    userLoadSequenceRef.current += 1;
     setLoading(true);
     const currentUserId = user?.id;
 
@@ -301,6 +319,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
             if (!adminCheckError && adminCheck) {
               console.log('⚠️ Session belongs to admin user, clearing for frontend');
+              userLoadSequenceRef.current += 1;
               sessionStorage.removeItem('session_type');
               await supabase.auth.signOut();
               if (mounted) setUser(null);
@@ -362,6 +381,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           void safeFetchUserData(session.user.id, 'Auth change user load');
         } else if (event === 'SIGNED_OUT') {
           console.log('👋 User signed out, clearing session');
+          userLoadSequenceRef.current += 1;
           sessionManager.removeSession(user?.id);
           setUser(null);
         } else if (event === 'TOKEN_REFRESHED' && session?.user) {
@@ -437,6 +457,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Clear any existing session data first (including admin sessions)
       console.log('🧹 Clearing existing session data...');
+      userLoadSequenceRef.current += 1;
       sessionStorage.removeItem('session_type');
       sessionStorage.removeItem('admin_session_token');
       adminSessionManager.removeSession();
@@ -587,6 +608,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       notification.showError('Login Failed', errorMessage);
 
       // Clear any partial session data on error
+      userLoadSequenceRef.current += 1;
       sessionManager.removeSession();
       setUser(null);
 
@@ -602,6 +624,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('🔍 Attempting registration for:', JSON.stringify(userData));
 
       // Clear any existing session data first
+      userLoadSequenceRef.current += 1;
       sessionManager.removeSession();
       await supabase.auth.signOut();
 
@@ -707,6 +730,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       notification.showError('Registration Failed', errorMessage);
 
       // Clear any partial session data on error
+      userLoadSequenceRef.current += 1;
       sessionManager.removeSession();
       setUser(null);
 
