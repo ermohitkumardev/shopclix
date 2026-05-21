@@ -30,6 +30,11 @@ const getAdminBySession = async (supabase: ReturnType<typeof createClient>, toke
   return data.admin;
 };
 
+const normalizeSettingValue = (value: unknown) => {
+  if (value === null || value === undefined) return '';
+  return value;
+};
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -68,16 +73,19 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    const appliedUpdates = [];
+
     for (const update of updates) {
       const { key, value, description } = update || {};
       if (!key) continue;
+      const settingKey = String(key);
       const { error } = await supabase
         .from('tbl_system_settings')
         .upsert(
           {
-            tss_setting_key: key,
-            tss_setting_value: value,
-            tss_description: description || `${String(key).replace('_', ' ')} setting`
+            tss_setting_key: settingKey,
+            tss_setting_value: normalizeSettingValue(value),
+            tss_description: description || `${settingKey.replace(/_/g, ' ')} setting`
           },
           { onConflict: 'tss_setting_key' }
         );
@@ -85,14 +93,16 @@ Deno.serve(async (req: Request) => {
       if (error) {
         throw error;
       }
+
+      appliedUpdates.push(settingKey);
     }
 
     await logAdminAction(supabase, admin.tau_id, 'upsert_settings', 'settings', {
-      updated: updates.length,
-      keys: updates.map((u: any) => u.key)
+      updated: appliedUpdates.length,
+      keys: appliedUpdates
     });
 
-    return new Response(JSON.stringify({ success: true, data: { updated: updates.length } }), {
+    return new Response(JSON.stringify({ success: true, data: { updated: appliedUpdates.length } }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

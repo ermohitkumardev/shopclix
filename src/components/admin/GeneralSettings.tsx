@@ -62,8 +62,8 @@ const GeneralSettings: React.FC = () => {
                 { key: 'maintenance_message', value: String(formData.maintenanceMessage || '') },
                 { key: 'maintenance_notice_enabled', value: Boolean(formData.maintenanceNoticeEnabled) },
                 { key: 'maintenance_notice_message', value: String(formData.maintenanceNoticeMessage || '') },
-                { key: 'maintenance_window_start_at', value: formData.maintenanceWindowStartAt ? String(formData.maintenanceWindowStartAt) : null },
-                { key: 'maintenance_window_end_at', value: formData.maintenanceWindowEndAt ? String(formData.maintenanceWindowEndAt) : null },
+                { key: 'maintenance_window_start_at', value: formData.maintenanceWindowStartAt ? String(formData.maintenanceWindowStartAt) : '' },
+                { key: 'maintenance_window_end_at', value: formData.maintenanceWindowEndAt ? String(formData.maintenanceWindowEndAt) : '' },
                 {
                     key: 'maintenance_allowed_ips',
                     value: String(formData.maintenanceAllowedIps || '')
