@@ -57,6 +57,16 @@ interface AdminSettings {
   subscriptionWalletAddress: string;
 }
 
+type Eip6963ProviderDetail = {
+  info?: {
+    name?: string;
+    rdns?: string;
+    icon?: string;
+    uuid?: string;
+  };
+  provider?: any;
+};
+
 // Wallet Service Class
 export class WalletService {
   private static instance: WalletService;
@@ -65,6 +75,7 @@ export class WalletService {
   private externalProvider: any | null = null;
   private isConnecting: boolean = false;
   private adminSettings: AdminSettings | null = null;
+  private eip6963Providers: Eip6963ProviderDetail[] = [];
   // FIX: Store the current wallet state internally to restore on re-render
   private currentWalletState: WalletState = {
     isConnected: false,
@@ -96,6 +107,21 @@ export class WalletService {
       } catch (error) {
         console.warn('Failed to restore persisted wallet state:', error);
       }
+
+      window.addEventListener('eip6963:announceProvider', (event: Event) => {
+        const detail = (event as CustomEvent<Eip6963ProviderDetail>).detail;
+        if (!detail?.provider) return;
+
+        const providerId = String(detail.info?.uuid || detail.info?.rdns || detail.info?.name || '');
+        const alreadyKnown = this.eip6963Providers.some((known) => (
+          known.provider === detail.provider ||
+          (!!providerId && providerId === String(known.info?.uuid || known.info?.rdns || known.info?.name || ''))
+        ));
+
+        if (!alreadyKnown) {
+          this.eip6963Providers.push(detail);
+        }
+      });
     }
   }
 
@@ -201,6 +227,23 @@ export class WalletService {
     return [ethereum];
   }
 
+  private requestEip6963Providers(): Eip6963ProviderDetail[] {
+    if (typeof window === 'undefined') return [];
+
+    try {
+      window.dispatchEvent(new Event('eip6963:requestProvider'));
+    } catch (error) {
+      console.warn('Failed to request EIP-6963 wallet providers:', error);
+    }
+
+    return this.eip6963Providers;
+  }
+
+  private isMobileBrowser(): boolean {
+    if (typeof navigator === 'undefined') return false;
+    return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '');
+  }
+
   private getInAppWalletName(): 'SafePal' | 'Trust Wallet' | 'MetaMask' | null {
     if (typeof navigator === 'undefined') return null;
     const ua = navigator.userAgent || '';
@@ -211,7 +254,10 @@ export class WalletService {
   }
 
   private findProviderByWalletName(walletName: 'SafePal' | 'Trust Wallet' | 'MetaMask'): any | null {
-    const providers = this.getEthereumProviders();
+    const providers = [
+      ...this.requestEip6963Providers().map((detail) => detail.provider).filter(Boolean),
+      ...this.getEthereumProviders()
+    ];
     if (walletName === 'SafePal') {
       return providers.find((provider) => provider?.isSafePal) || null;
     }
@@ -219,6 +265,40 @@ export class WalletService {
       return providers.find((provider) => provider?.isTrust || provider?.isTrustWallet) || null;
     }
     return providers.find((provider) => provider?.isMetaMask && !provider?.isSafePal && !provider?.isTrust && !provider?.isTrustWallet) || null;
+  }
+
+  private addWalletIfAvailable(
+    wallets: WalletInfo[],
+    wallet: WalletInfo,
+    seenNames: Set<string>,
+    seenProviders: Set<any>
+  ): void {
+    if (!wallet.provider || seenNames.has(wallet.name) || seenProviders.has(wallet.provider)) return;
+    wallets.push(wallet);
+    seenNames.add(wallet.name);
+    seenProviders.add(wallet.provider);
+  }
+
+  private getEip6963WalletInfo(detail: Eip6963ProviderDetail): WalletInfo | null {
+    const provider = detail.provider;
+    if (!provider) return null;
+
+    const name = String(detail.info?.name || '').toLowerCase();
+    const rdns = String(detail.info?.rdns || '').toLowerCase();
+
+    if (provider.isSafePal || name.includes('safepal') || rdns.includes('safepal')) {
+      return { name: 'SafePal', icon: '🛡️', isInstalled: true, provider };
+    }
+
+    if (provider.isTrust || provider.isTrustWallet || name.includes('trust') || rdns.includes('trust')) {
+      return { name: 'Trust Wallet', icon: '🔷', isInstalled: true, provider };
+    }
+
+    if (provider.isMetaMask || name.includes('metamask') || rdns.includes('metamask')) {
+      return { name: 'MetaMask', icon: '🦊', isInstalled: true, provider };
+    }
+
+    return null;
   }
 
   // Get USDT contract address from settings
@@ -257,7 +337,7 @@ export class WalletService {
     }
 
     const inAppWalletName = this.getInAppWalletName();
-    if (inAppWalletName) {
+    if (inAppWalletName && this.isMobileBrowser()) {
       const provider = this.findProviderByWalletName(inAppWalletName) || (window as any).ethereum;
       const icon = inAppWalletName === 'MetaMask' ? '🦊' : inAppWalletName === 'Trust Wallet' ? '🔷' : '🛡️';
       wallets.push({
@@ -270,6 +350,13 @@ export class WalletService {
       return wallets;
     }
 
+    const seenNames = new Set<string>();
+    const seenProviders = new Set<any>();
+    for (const detail of this.requestEip6963Providers()) {
+      const wallet = this.getEip6963WalletInfo(detail);
+      if (wallet) this.addWalletIfAvailable(wallets, wallet, seenNames, seenProviders);
+    }
+
     const providers = this.getEthereumProviders();
     const safePalProvider = providers.find((provider) => provider?.isSafePal);
     const trustProvider = providers.find((provider) => provider?.isTrust || provider?.isTrustWallet);
@@ -278,30 +365,30 @@ export class WalletService {
     );
 
     if (safePalProvider) {
-      wallets.push({
+      this.addWalletIfAvailable(wallets, {
         name: 'SafePal',
         icon: '🛡️',
         isInstalled: true,
         provider: safePalProvider,
-      });
+      }, seenNames, seenProviders);
     }
 
     if (trustProvider && trustProvider !== safePalProvider) {
-      wallets.push({
+      this.addWalletIfAvailable(wallets, {
         name: 'Trust Wallet',
         icon: '🔷',
         isInstalled: true,
         provider: trustProvider,
-      });
+      }, seenNames, seenProviders);
     }
 
     if (metaMaskProvider && metaMaskProvider !== safePalProvider && metaMaskProvider !== trustProvider) {
-      wallets.push({
+      this.addWalletIfAvailable(wallets, {
         name: 'MetaMask',
         icon: '🦊',
         isInstalled: true,
         provider: metaMaskProvider,
-      });
+      }, seenNames, seenProviders);
     }
 
     // Binance Chain Wallet

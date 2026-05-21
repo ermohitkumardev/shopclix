@@ -211,6 +211,29 @@ const Payment: React.FC = () => {
   }, [location.state, navigate, notification, walletService]);
 
   useEffect(() => {
+    const refreshDetectedWallets = () => {
+      setAvailableWallets(walletService.detectWallets());
+    };
+
+    refreshDetectedWallets();
+
+    const timeoutIds = [250, 1000, 2500].map((delay) =>
+      window.setTimeout(refreshDetectedWallets, delay)
+    );
+
+    window.addEventListener('load', refreshDetectedWallets);
+    window.addEventListener('focus', refreshDetectedWallets);
+    window.addEventListener('ethereum#initialized', refreshDetectedWallets as EventListener);
+
+    return () => {
+      timeoutIds.forEach((id) => window.clearTimeout(id));
+      window.removeEventListener('load', refreshDetectedWallets);
+      window.removeEventListener('focus', refreshDetectedWallets);
+      window.removeEventListener('ethereum#initialized', refreshDetectedWallets as EventListener);
+    };
+  }, [walletService]);
+
+  useEffect(() => {
     const isUpgrade = String(selectedPlan?.tsp_type || '').toLowerCase() === 'upgrade';
     const canUseReserved = isUpgrade && workingWalletReservedBalance > 0;
     if (!canUseReserved) {
