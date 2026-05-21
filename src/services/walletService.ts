@@ -13,8 +13,10 @@ const BSC_TESTNET_CONFIG = {
     decimals: 18,
   },
   rpcUrls: [
-    'https://data-seed-prebsc-1-s1.binance.org:8545/',
-    'https://data-seed-prebsc-2-s1.binance.org:8545/'
+    'https://bsc-testnet-dataseed.bnbchain.org',
+    'https://data-seed-prebsc-1-s1.bnbchain.org:8545',
+    'https://data-seed-prebsc-2-s1.bnbchain.org:8545',
+    'https://bsc-testnet-rpc.publicnode.com'
   ],
   blockExplorerUrls: ['https://testnet.bscscan.com/'],
 };
@@ -27,7 +29,7 @@ const BSC_MAINNET_CONFIG = {
     symbol: 'BNB',
     decimals: 18,
   },
-  rpcUrls: ['https://bsc-dataseed1.binance.org/'],
+  rpcUrls: ['https://bsc-dataseed.bnbchain.org', 'https://bsc-dataseed-public.bnbchain.org'],
   blockExplorerUrls: ['https://bscscan.com/'],
 };
 
@@ -48,6 +50,7 @@ const DISTRIBUTION_ABI = [
 ];
 
 const ERC20_TRANSFER_TOPIC = ethers.id('Transfer(address,address,uint256)');
+const READONLY_RPC_TIMEOUT_MS = 8000;
 
 // Admin Settings Interface
 interface AdminSettings {
@@ -199,12 +202,24 @@ export class WalletService {
 
   private getReadonlyProvider(): ethers.JsonRpcProvider {
     const networkConfig = this.getNetworkConfig();
-    return new ethers.JsonRpcProvider(networkConfig.rpcUrls[0]);
+    return this.createReadonlyProvider(networkConfig.rpcUrls[0]);
   }
 
   private getReadonlyProviders(): ethers.JsonRpcProvider[] {
     const networkConfig = this.getNetworkConfig();
-    return networkConfig.rpcUrls.map((rpcUrl) => new ethers.JsonRpcProvider(rpcUrl));
+    return networkConfig.rpcUrls.map((rpcUrl) => this.createReadonlyProvider(rpcUrl));
+  }
+
+  private createReadonlyProvider(rpcUrl: string): ethers.JsonRpcProvider {
+    const request = new ethers.FetchRequest(rpcUrl);
+    request.timeout = READONLY_RPC_TIMEOUT_MS;
+    return new ethers.JsonRpcProvider(request);
+  }
+
+  private destroyReadonlyProvider(provider: ethers.JsonRpcProvider | ethers.BrowserProvider): void {
+    if (provider instanceof ethers.JsonRpcProvider) {
+      provider.destroy();
+    }
   }
 
   private isRpcFetchError(error: any): boolean {
@@ -838,9 +853,12 @@ export class WalletService {
 
     for (const provider of providers) {
       try {
-        return await provider.getBlockNumber();
+        const blockNumber = await provider.getBlockNumber();
+        this.destroyReadonlyProvider(provider);
+        return blockNumber;
       } catch (error) {
         lastError = error;
+        this.destroyReadonlyProvider(provider);
       }
     }
 
@@ -904,6 +922,8 @@ export class WalletService {
       } catch (error) {
         lastError = error;
         console.warn('USDT transfer recovery provider failed:', error);
+      } finally {
+        this.destroyReadonlyProvider(provider);
       }
     }
 
