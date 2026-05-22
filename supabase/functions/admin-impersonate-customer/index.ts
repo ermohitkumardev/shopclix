@@ -65,21 +65,22 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    const origin = req.headers.get('origin') || Deno.env.get('PROJECT_URL') || '';
+    const redirectTo = `${origin}/customer/impersonation-callback?mode=admin_impersonation`;
+
     const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
       type: 'magiclink',
       email: customer.tu_email,
-      options: {
-        redirectTo: `${req.headers.get('origin') || ''}/`,
-      },
+      options: { redirectTo },
     });
 
     if (linkError) throw linkError;
 
     const generatedUserId = linkData?.user?.id;
-    const tokenHash = linkData?.properties?.hashed_token;
+    const actionLink = linkData?.properties?.action_link;
 
-    if (!tokenHash || generatedUserId !== customer.tu_id) {
-      throw new Error('Unable to generate customer sign-in token');
+    if (!actionLink || generatedUserId !== customer.tu_id) {
+      throw new Error('Unable to generate customer sign-in link');
     }
 
     await logAdminAction(supabase, admin.tau_id, 'impersonate_customer', 'customers', {
@@ -93,8 +94,7 @@ Deno.serve(async (req: Request) => {
         data: {
           customerId: customer.tu_id,
           customerEmail: customer.tu_email,
-          tokenHash,
-          verificationType: 'magiclink',
+          actionLink,
         },
       }),
       {

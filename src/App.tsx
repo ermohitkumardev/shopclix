@@ -72,13 +72,6 @@ function ScrollToTop() {
 }
 
 function RootRoute() {
-  const { search } = useLocation();
-  const params = new URLSearchParams(search);
-
-  if (params.get('mode') === 'admin_impersonation') {
-    return <AuthCallback />;
-  }
-
   return <Home />;
 }
 
