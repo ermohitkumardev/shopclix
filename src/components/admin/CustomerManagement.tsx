@@ -392,7 +392,7 @@ const CustomerManagement: React.FC<CustomerManagementProps> = ({ initialSearchTe
 
             // Pass tokens via sessionStorage so the new tab can call setSession directly
             const impersonationKey = `impersonation_${Date.now()}`;
-            sessionStorage.setItem(impersonationKey, JSON.stringify({
+            localStorage.setItem(impersonationKey, JSON.stringify({
                 accessToken: data.accessToken,
                 refreshToken: data.refreshToken,
                 expiresAt: data.expiresAt,

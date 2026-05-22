@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { sessionManager, supabase } from '../../lib/supabase';
 import { useNotification } from '../../components/ui/NotificationProvider';
@@ -10,8 +10,12 @@ const AuthCallback: React.FC = () => {
   const notification = useNotification();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const ranRef = useRef(false);
 
   useEffect(() => {
+    if (ranRef.current) return;
+    ranRef.current = true;
+
     const handleAuthCallback = async () => {
       try {
         const token = searchParams.get('token');
@@ -36,10 +40,10 @@ const AuthCallback: React.FC = () => {
           const key = searchParams.get('key');
           if (!key) throw new Error('Missing impersonation key');
 
-          const stored = sessionStorage.getItem(key);
+          const stored = localStorage.getItem(key);
           if (!stored) throw new Error('Impersonation session data not found');
 
-          sessionStorage.removeItem(key);
+          localStorage.removeItem(key);
           const { accessToken, refreshToken } = JSON.parse(stored);
 
           const { data, error } = await supabase.auth.setSession({
