@@ -71,6 +71,17 @@ function ScrollToTop() {
   return null;
 }
 
+function RootRoute() {
+  const { search } = useLocation();
+  const params = new URLSearchParams(search);
+
+  if (params.get('mode') === 'admin_impersonation') {
+    return <AuthCallback />;
+  }
+
+  return <Home />;
+}
+
 function App() {
   return (
     <NotificationProvider>
@@ -170,7 +181,7 @@ const MainSite: React.FC = () => {
       <Navbar />
       <main className={notice.showBanner ? 'pt-24' : 'pt-16'}>
         <Routes>
-          <Route path="/" element={<Home />} />
+          <Route path="/" element={<RootRoute />} />
 
           {/* Static Pages */}
           <Route path="/contact" element={<ContactUs />} />

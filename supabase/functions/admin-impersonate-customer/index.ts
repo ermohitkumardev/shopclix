@@ -69,7 +69,7 @@ Deno.serve(async (req: Request) => {
       type: 'magiclink',
       email: customer.tu_email,
       options: {
-        redirectTo: `${req.headers.get('origin') || ''}/customer/impersonation-callback`,
+        redirectTo: `${req.headers.get('origin') || ''}/`,
       },
     });
 
