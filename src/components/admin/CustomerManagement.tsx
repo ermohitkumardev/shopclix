@@ -376,21 +376,25 @@ const CustomerManagement: React.FC<CustomerManagementProps> = ({ initialSearchTe
         try {
             setImpersonatingCustomerId(customer.tu_id);
             const data = await adminApi.post<{
-                actionLink: string;
+                tokenHash: string;
             }>('admin-impersonate-customer', {
                 userId: customer.tu_id
             });
 
-            if (!data?.actionLink) {
-                throw new Error('Failed to create customer login link');
+            if (!data?.tokenHash) {
+                throw new Error('Failed to create customer login token');
             }
 
-            const opened = window.open(data.actionLink, '_blank');
+            const callbackUrl = new URL('/customer/impersonation-callback', window.location.origin);
+            callbackUrl.searchParams.set('mode', 'admin_impersonation');
+            callbackUrl.searchParams.set('token', data.tokenHash);
+
+            const opened = window.open(callbackUrl.toString(), '_blank');
             if (opened) {
                 opened.opener = null;
             }
             if (!opened) {
-                window.location.href = data.actionLink;
+                window.location.href = callbackUrl.toString();
             }
 
             notification.showSuccess(

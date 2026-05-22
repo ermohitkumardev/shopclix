@@ -32,10 +32,11 @@ const AuthCallback: React.FC = () => {
           } else {
             throw new Error('Failed to verify reset token');
           }
-        } else if (mode === 'admin_impersonation') {
-          // Supabase has already exchanged the magic link token and set the session
-          // in the URL fragment before redirecting here. supabase-js auto-processes it.
-          const { data, error } = await supabase.auth.getSession();
+        } else if (mode === 'admin_impersonation' && token) {
+          const { data, error } = await supabase.auth.verifyOtp({
+            token_hash: token,
+            type: 'magiclink',
+          });
 
           if (error) throw error;
 
