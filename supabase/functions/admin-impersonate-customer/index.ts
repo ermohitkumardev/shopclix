@@ -9,7 +9,7 @@ const corsHeaders = {
 
 const isUuid = (value: unknown) =>
   typeof value === 'string' &&
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i.test(value);
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value.trim());
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -32,7 +32,8 @@ Deno.serve(async (req: Request) => {
     });
 
     const admin = await requireAdminSession(supabase, req.headers.get('X-Admin-Session'));
-    const { userId } = await req.json();
+    const body = await req.json();
+    const userId = String(body?.userId || body?.customerId || body?.customer_id || '').trim();
 
     if (!isUuid(userId)) {
       return new Response(JSON.stringify({ success: false, error: 'Invalid customer ID' }), {
@@ -68,7 +69,7 @@ Deno.serve(async (req: Request) => {
       type: 'magiclink',
       email: customer.tu_email,
       options: {
-        redirectTo: `${req.headers.get('origin') || ''}/auth/callback`,
+        redirectTo: `${req.headers.get('origin') || ''}/customer/impersonation-callback`,
       },
     });
 

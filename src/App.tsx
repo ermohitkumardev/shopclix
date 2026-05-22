@@ -229,6 +229,7 @@ const MainSite: React.FC = () => {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route path="/customer/impersonation-callback" element={<AuthCallback />} />
           <Route path="/verify-otp" element={<VerifyOTP />} />
           <Route path="/subscription-plans" element={<SubscriptionPlans />} />
           <Route path="/payment" element={

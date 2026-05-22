@@ -386,7 +386,7 @@ const CustomerManagement: React.FC<CustomerManagementProps> = ({ initialSearchTe
                 throw new Error('Failed to create customer login token');
             }
 
-            const callbackUrl = new URL('/auth/callback', window.location.origin);
+            const callbackUrl = new URL('/customer/impersonation-callback', window.location.origin);
             callbackUrl.searchParams.set('type', data.verificationType || 'magiclink');
             callbackUrl.searchParams.set('mode', 'admin_impersonation');
             callbackUrl.searchParams.set('token', data.tokenHash);
