@@ -41,14 +41,24 @@ const AuthCallback: React.FC = () => {
           if (!key) throw new Error('Missing impersonation key');
 
           const stored = localStorage.getItem(key);
-          if (!stored) throw new Error('Impersonation session data not found');
+          localStorage.removeItem(key); // always remove immediately, even on error
 
-          localStorage.removeItem(key);
-          const { accessToken, refreshToken } = JSON.parse(stored);
+          if (!stored) throw new Error('Impersonation session data not found or already used');
+
+          const payload = JSON.parse(stored);
+
+          // Reject if the stored token has passed its 60s TTL
+          if (!payload.expiresAt || Date.now() > payload.expiresAt) {
+            throw new Error('Impersonation token has expired');
+          }
+
+          if (!payload.accessToken || !payload.refreshToken) {
+            throw new Error('Malformed impersonation payload');
+          }
 
           const { data, error } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken,
+            access_token: payload.accessToken,
+            refresh_token: payload.refreshToken,
           });
 
           if (error) throw error;

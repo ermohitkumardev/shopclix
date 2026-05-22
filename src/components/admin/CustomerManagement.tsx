@@ -390,14 +390,19 @@ const CustomerManagement: React.FC<CustomerManagementProps> = ({ initialSearchTe
                 throw new Error('Failed to create customer session');
             }
 
-            // Pass tokens via sessionStorage so the new tab can call setSession directly
-            const impersonationKey = `impersonation_${Date.now()}`;
+            // Use a cryptographic random key (not predictable like Date.now())
+            // Tokens expire from localStorage after 60s as a safety net if the tab fails
+            const impersonationKey = `imp_${crypto.randomUUID()}`;
+            const expiresAt = Date.now() + 60_000;
             localStorage.setItem(impersonationKey, JSON.stringify({
                 accessToken: data.accessToken,
                 refreshToken: data.refreshToken,
-                expiresAt: data.expiresAt,
-                expiresIn: data.expiresIn,
+                customerId: data.customerId,
+                expiresAt,
             }));
+
+            // Schedule cleanup in case the new tab never reads it (crash, popup blocked, etc.)
+            setTimeout(() => localStorage.removeItem(impersonationKey), 60_000);
 
             const callbackUrl = new URL('/customer/impersonation-callback', window.location.origin);
             callbackUrl.searchParams.set('mode', 'admin_impersonation');

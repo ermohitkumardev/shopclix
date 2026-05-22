@@ -31,6 +31,15 @@ Deno.serve(async (req: Request) => {
     });
 
     const admin = await requireAdminSession(adminClient, req.headers.get('X-Admin-Session'));
+
+    // Only super_admin can impersonate customers — sub-admins must not have this power
+    if (admin.tau_role !== 'super_admin') {
+      return new Response(JSON.stringify({ success: false, error: 'Insufficient permissions' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const body = await req.json();
     const userId = String(body?.userId || body?.customerId || body?.customer_id || '').trim();
 
