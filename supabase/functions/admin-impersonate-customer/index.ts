@@ -19,19 +19,18 @@ Deno.serve(async (req: Request) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
 
-    if (!supabaseUrl || !supabaseServiceKey) {
+    if (!supabaseUrl || !supabaseServiceKey || !supabaseAnonKey) {
       throw new Error('Missing Supabase environment variables');
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
+    // Service-role client for admin operations
+    const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    const admin = await requireAdminSession(supabase, req.headers.get('X-Admin-Session'));
+    const admin = await requireAdminSession(adminClient, req.headers.get('X-Admin-Session'));
     const body = await req.json();
     const userId = String(body?.userId || body?.customerId || body?.customer_id || '').trim();
 
@@ -42,7 +41,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const { data: customer, error: customerError } = await supabase
+    const { data: customer, error: customerError } = await adminClient
       .from('tbl_users')
       .select('tu_id, tu_email, tu_user_type, tu_is_active')
       .eq('tu_id', userId)
@@ -65,7 +64,8 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
+    // Step 1: Generate magic link server-side to get the hashed_token
+    const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
       type: 'magiclink',
       email: customer.tu_email,
     });
@@ -79,7 +79,31 @@ Deno.serve(async (req: Request) => {
       throw new Error('Unable to generate customer sign-in token');
     }
 
-    await logAdminAction(supabase, admin.tau_id, 'impersonate_customer', 'customers', {
+    // Step 2: Verify the token server-side using an anon client with implicit flow.
+    // This avoids the PKCE requirement that would fail on the browser side since
+    // there is no matching code verifier for a server-generated token.
+    const anonClient = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        flowType: 'implicit',
+        autoRefreshToken: false,
+        persistSession: false,
+        detectSessionInUrl: false,
+      },
+    });
+
+    const { data: verifyData, error: verifyError } = await anonClient.auth.verifyOtp({
+      token_hash: tokenHash,
+      type: 'magiclink',
+    });
+
+    if (verifyError) throw verifyError;
+
+    const session = verifyData?.session;
+    if (!session?.access_token || !session?.refresh_token) {
+      throw new Error('Failed to create customer session');
+    }
+
+    await logAdminAction(adminClient, admin.tau_id, 'impersonate_customer', 'customers', {
       customer_id: customer.tu_id,
       customer_email: customer.tu_email,
     });
@@ -90,7 +114,10 @@ Deno.serve(async (req: Request) => {
         data: {
           customerId: customer.tu_id,
           customerEmail: customer.tu_email,
-          tokenHash,
+          accessToken: session.access_token,
+          refreshToken: session.refresh_token,
+          expiresAt: session.expires_at,
+          expiresIn: session.expires_in,
         },
       }),
       {

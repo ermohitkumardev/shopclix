@@ -1,16 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { createClient } from '@supabase/supabase-js';
 import { sessionManager, supabase } from '../../lib/supabase';
 import { useNotification } from '../../components/ui/NotificationProvider';
 import { Shield, Loader } from 'lucide-react';
-
-// Separate client with implicit flow for server-generated token verification (no PKCE code verifier needed)
-const implicitSupabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY,
-  { auth: { flowType: 'implicit', autoRefreshToken: false, persistSession: false, detectSessionInUrl: false } }
-);
 
 const AuthCallback: React.FC = () => {
   const navigate = useNavigate();
@@ -40,10 +32,19 @@ const AuthCallback: React.FC = () => {
           } else {
             throw new Error('Failed to verify reset token');
           }
-        } else if (mode === 'admin_impersonation' && token) {
-          const { data, error } = await implicitSupabase.auth.verifyOtp({
-            token_hash: token,
-            type: 'magiclink',
+        } else if (mode === 'admin_impersonation') {
+          const key = searchParams.get('key');
+          if (!key) throw new Error('Missing impersonation key');
+
+          const stored = sessionStorage.getItem(key);
+          if (!stored) throw new Error('Impersonation session data not found');
+
+          sessionStorage.removeItem(key);
+          const { accessToken, refreshToken } = JSON.parse(stored);
+
+          const { data, error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
           });
 
           if (error) throw error;
