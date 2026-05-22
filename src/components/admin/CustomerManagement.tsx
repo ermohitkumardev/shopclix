@@ -7,7 +7,7 @@ import {
     Users, Search, Eye, CreditCard as Edit, UserCheck, UserX, Mail, Phone,
     Calendar, DollarSign, ArrowLeft, Save, X, CheckCircle, AlertCircle,
     CreditCard, User, Settings, ChevronLeft, ChevronRight, ChevronsLeft,
-    ChevronsRight, MoreHorizontal, Key, Wallet, Activity, ArrowDownLeft, ArrowUpRight
+    ChevronsRight, MoreHorizontal, Key, Wallet, Activity, ArrowDownLeft, ArrowUpRight, LogIn
 } from 'lucide-react';
 
 let inFlightCustomersRequest: {
@@ -181,6 +181,7 @@ const CustomerManagement: React.FC<CustomerManagementProps> = ({ initialSearchTe
     const [showCustomerDetails, setShowCustomerDetails] = useState(false);
     const [editMode, setEditMode] = useState(false);
     const [activeTab, setActiveTab] = useState('profile');
+    const [impersonatingCustomerId, setImpersonatingCustomerId] = useState<string | null>(null);
 
     // Pagination state
     const [currentPage, setCurrentPage] = useState(1);
@@ -188,7 +189,7 @@ const CustomerManagement: React.FC<CustomerManagementProps> = ({ initialSearchTe
     const [totalCount, setTotalCount] = useState(0);
 
     const notification = useNotification();
-    // impersonation removed
+    const { hasPermission } = useAdminAuth();
     const topRef = useScrollToTopOnChange([currentPage], { smooth: true });
 
     useEffect(() => {
@@ -366,6 +367,50 @@ const CustomerManagement: React.FC<CustomerManagementProps> = ({ initialSearchTe
         }
     };
 
+    const handleCustomerLogin = async (customer: Customer) => {
+        if (!customer.tu_is_active) {
+            notification.showError('Login Blocked', 'Customer account is disabled');
+            return;
+        }
+
+        try {
+            setImpersonatingCustomerId(customer.tu_id);
+            const data = await adminApi.post<{
+                tokenHash: string;
+                verificationType: string;
+            }>('admin-impersonate-customer', {
+                userId: customer.tu_id
+            });
+
+            if (!data?.tokenHash) {
+                throw new Error('Failed to create customer login token');
+            }
+
+            const callbackUrl = new URL('/auth/callback', window.location.origin);
+            callbackUrl.searchParams.set('type', data.verificationType || 'magiclink');
+            callbackUrl.searchParams.set('mode', 'admin_impersonation');
+            callbackUrl.searchParams.set('token', data.tokenHash);
+
+            const opened = window.open(callbackUrl.toString(), '_blank');
+            if (opened) {
+                opened.opener = null;
+            }
+            if (!opened) {
+                window.location.href = callbackUrl.toString();
+            }
+
+            notification.showSuccess(
+                'Customer Login Started',
+                `Opening dashboard for ${customer.tbl_user_profiles?.tup_first_name || customer.tu_email}`
+            );
+        } catch (error: any) {
+            console.error('Failed to login as customer:', error);
+            notification.showError('Login Failed', error?.message || 'Failed to login as customer');
+        } finally {
+            setImpersonatingCustomerId(null);
+        }
+    };
+
     const totalPages = Math.ceil(totalCount / itemsPerPage);
 
     const getPageNumbers = () => {
@@ -436,6 +481,8 @@ const CustomerManagement: React.FC<CustomerManagementProps> = ({ initialSearchTe
                 setEditMode={setEditMode}
                 activeTab={activeTab}
                 setActiveTab={setActiveTab}
+                onCustomerLogin={handleCustomerLogin}
+                impersonatingCustomerId={impersonatingCustomerId}
             />
         );
     }
@@ -697,6 +744,20 @@ const CustomerManagement: React.FC<CustomerManagementProps> = ({ initialSearchTe
                                         >
                                             <Key className="h-4 w-4" />
                                         </button>
+                                        {hasPermission('customers' as any, 'write') && (
+                                            <button
+                                                onClick={() => handleCustomerLogin(customer)}
+                                                disabled={impersonatingCustomerId === customer.tu_id || !customer.tu_is_active}
+                                                className={`p-1 rounded ${
+                                                    impersonatingCustomerId === customer.tu_id || !customer.tu_is_active
+                                                        ? 'text-gray-300 cursor-not-allowed'
+                                                        : 'text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50'
+                                                }`}
+                                                title={customer.tu_is_active ? 'Login as Customer' : 'Customer account is disabled'}
+                                            >
+                                                <LogIn className={`h-4 w-4 ${impersonatingCustomerId === customer.tu_id ? 'animate-pulse' : ''}`} />
+                                            </button>
+                                        )}
                                         <button
                                             onClick={() => handleToggleStatus(customer, customer.tu_is_active)}
                                             className={`p-1 rounded ${customer.tu_is_active ? 'text-red-600 hover:text-red-800 hover:bg-red-50' : 'text-green-600 hover:text-green-800 hover:bg-green-50'}`}
@@ -777,7 +838,20 @@ const CustomerDetails: React.FC<{
     setEditMode: (mode: boolean) => void;
     activeTab: string;
     setActiveTab: (tab: string) => void;
-}> = ({ customer: initialCustomer, onBack, onUpdate, onCustomerUpdated, editMode, setEditMode, activeTab, setActiveTab }) => {
+    onCustomerLogin: (customer: Customer) => void;
+    impersonatingCustomerId: string | null;
+}> = ({
+    customer: initialCustomer,
+    onBack,
+    onUpdate,
+    onCustomerUpdated,
+    editMode,
+    setEditMode,
+    activeTab,
+    setActiveTab,
+    onCustomerLogin,
+    impersonatingCustomerId
+}) => {
     const { hasPermission } = useAdminAuth();
 
     // ✅ Local customer state — decoupled from parent prop
@@ -1016,6 +1090,21 @@ const CustomerDetails: React.FC<{
                         </div>
                     </div>
                     <div className="flex items-center space-x-3">
+                        {hasPermission('customers' as any, 'write') && (
+                            <button
+                                onClick={() => onCustomerLogin(customer)}
+                                disabled={impersonatingCustomerId === customer.tu_id || !customer.tu_is_active}
+                                className={`px-4 py-2 rounded-lg transition-colors flex items-center space-x-2 ${
+                                    impersonatingCustomerId === customer.tu_id || !customer.tu_is_active
+                                        ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                                        : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                                }`}
+                                title={customer.tu_is_active ? 'Login as Customer' : 'Customer account is disabled'}
+                            >
+                                <LogIn className={`h-4 w-4 ${impersonatingCustomerId === customer.tu_id ? 'animate-pulse' : ''}`} />
+                                <span>Login as Customer</span>
+                            </button>
+                        )}
                         {activeTab === 'profile' && (
                             <>
                                 {editMode ? (

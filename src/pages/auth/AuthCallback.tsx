@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
+import { sessionManager, supabase } from '../../lib/supabase';
 import { useNotification } from '../../components/ui/NotificationProvider';
 import { Shield, Loader } from 'lucide-react';
 
@@ -16,6 +16,7 @@ const AuthCallback: React.FC = () => {
       try {
         const token = searchParams.get('token');
         const type = searchParams.get('type');
+        const mode = searchParams.get('mode');
 
         if (type === 'recovery' && token) {
           const { data, error } = await supabase.auth.verifyOtp({
@@ -31,14 +32,31 @@ const AuthCallback: React.FC = () => {
           } else {
             throw new Error('Failed to verify reset token');
           }
+        } else if (type === 'magiclink' && mode === 'admin_impersonation' && token) {
+          const { data, error } = await supabase.auth.verifyOtp({
+            token_hash: token,
+            type: 'magiclink',
+          });
+
+          if (error) throw error;
+
+          if (data.session) {
+            sessionStorage.removeItem('customer_logout_in_progress');
+            sessionStorage.setItem('session_type', 'customer');
+            sessionManager.saveSession(data.session);
+            notification.showSuccess('Customer Session Started', 'Opening customer dashboard.');
+            navigate('/customer/dashboard', { replace: true });
+          } else {
+            throw new Error('Failed to create customer session');
+          }
         } else {
           navigate('/');
         }
       } catch (err: any) {
         console.error('Auth callback error:', err);
         setError(err?.message || 'Authentication failed');
-        notification.showError('Authentication Failed', 'The reset link is invalid or has expired.');
-        setTimeout(() => navigate('/forgot-password'), 3000);
+        notification.showError('Authentication Failed', 'The login link is invalid or has expired.');
+        setTimeout(() => navigate(type === 'recovery' ? '/forgot-password' : '/customer/login'), 3000);
       } finally {
         setLoading(false);
       }
@@ -56,7 +74,7 @@ const AuthCallback: React.FC = () => {
               <Loader className="h-8 w-8 text-indigo-600 animate-spin" />
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Verifying...</h2>
-            <p className="text-gray-600">Please wait while we verify your reset link.</p>
+            <p className="text-gray-600">Please wait while we verify your login link.</p>
           </div>
         </div>
       </div>
@@ -84,4 +102,3 @@ const AuthCallback: React.FC = () => {
 };
 
 export default AuthCallback;
-
