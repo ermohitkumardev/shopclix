@@ -2,6 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useNotification } from '../ui/NotificationProvider';
 import { Wallet, Copy, RefreshCw, CheckCircle, XCircle, AlertCircle, Star } from 'lucide-react';
+import { useAdmin } from '../../contexts/AdminContext';
+import { WalletService } from '../../services/walletService';
+import { WalletInfo } from '../../types/wallet';
+import { extractEdgeFunctionErrorMessage } from '../../utils/edgeFunctionError';
 
 interface UserWallet {
     tuwc_id: string;
@@ -23,13 +27,52 @@ const WalletList: React.FC<WalletListProps> = ({ userId }) => {
     const [userWallets, setUserWallets] = useState<UserWallet[]>([]);
     const [loading, setLoading] = useState(true);
     const [settingDefault, setSettingDefault] = useState<string | null>(null);
+    const [isConnecting, setIsConnecting] = useState(false);
+    const [availableWallets, setAvailableWallets] = useState<WalletInfo[]>([]);
+    const [showWalletChoices, setShowWalletChoices] = useState(false);
     const notification = useNotification();
+    const { settings } = useAdmin();
+    const [walletService] = useState(() => WalletService.getInstance());
 
     useEffect(() => {
         if (userId) {
             loadUserWallets();
         }
     }, [userId]);
+
+    useEffect(() => {
+        if (!settings) return;
+
+        walletService.setAdminSettings({
+            paymentMode: settings.paymentMode?.toString() || '0',
+            usdtAddress: settings.usdtAddress || '',
+            subscriptionContractAddress: settings.subscriptionContractAddress || '',
+            subscriptionWalletAddress: settings.subscriptionWalletAddress || ''
+        });
+    }, [settings, walletService]);
+
+    useEffect(() => {
+        const refreshDetectedWallets = () => {
+            setAvailableWallets(walletService.detectWallets());
+        };
+
+        refreshDetectedWallets();
+
+        const timeoutIds = [250, 1000, 2500].map((delay) =>
+            window.setTimeout(refreshDetectedWallets, delay)
+        );
+
+        window.addEventListener('load', refreshDetectedWallets);
+        window.addEventListener('focus', refreshDetectedWallets);
+        window.addEventListener('ethereum#initialized', refreshDetectedWallets as EventListener);
+
+        return () => {
+            timeoutIds.forEach((id) => window.clearTimeout(id));
+            window.removeEventListener('load', refreshDetectedWallets);
+            window.removeEventListener('focus', refreshDetectedWallets);
+            window.removeEventListener('ethereum#initialized', refreshDetectedWallets as EventListener);
+        };
+    }, [walletService]);
 
     const loadUserWallets = async () => {
         if (!userId) return;
@@ -54,6 +97,85 @@ const WalletList: React.FC<WalletListProps> = ({ userId }) => {
         } finally {
             setLoading(false);
         }
+    };
+
+    const getWalletType = (provider: any): string => {
+        if (provider?.isMetaMask) return 'metamask';
+        if (provider?.isTrust || provider?.isTrustWallet) return 'trust';
+        if (provider?.isSafePal) return 'safepal';
+        if (provider?.isBinanceChain || provider?.isBinance) return 'binance';
+        return 'web3';
+    };
+
+    const saveWalletConnection = async (
+        address: string,
+        walletName: string,
+        walletType: string,
+        chainId: number | null
+    ) => {
+        const { data, error } = await supabase.functions.invoke('upsert-wallet-connection', {
+            body: {
+                wallet_address: address,
+                wallet_name: walletName,
+                wallet_type: walletType,
+                chain_id: chainId
+            }
+        });
+
+        if (error) {
+            throw new Error(await extractEdgeFunctionErrorMessage(error));
+        }
+
+        if (!data?.success) {
+            throw new Error(data?.error || 'Failed to save wallet connection');
+        }
+    };
+
+    const connectSelectedWallet = async (walletInfo: WalletInfo) => {
+        if (!walletInfo.provider || isConnecting) return;
+
+        setIsConnecting(true);
+        try {
+            const wallet = await walletService.connectWallet(walletInfo.provider);
+            if (!wallet.address) {
+                throw new Error('No wallet address returned by provider');
+            }
+
+            await saveWalletConnection(
+                wallet.address,
+                wallet.walletName || walletInfo.name || 'Unknown Wallet',
+                getWalletType(walletInfo.provider),
+                wallet.chainId
+            );
+
+            await loadUserWallets();
+            setShowWalletChoices(false);
+            notification.showSuccess('Wallet Connected', 'Wallet connected successfully');
+        } catch (error: any) {
+            console.error('Failed to connect wallet:', error);
+            const message = String(error?.message || 'Unable to connect wallet').replace(/[<>]/g, '');
+            notification.showError('Connection Failed', message);
+            walletService.disconnect();
+        } finally {
+            setIsConnecting(false);
+        }
+    };
+
+    const handleConnectWallet = async () => {
+        const wallets = walletService.detectWallets();
+        setAvailableWallets(wallets);
+
+        if (wallets.length === 0) {
+            notification.showError('Wallet Not Found', 'Please open this page in a Web3 wallet browser or install a supported wallet.');
+            return;
+        }
+
+        if (wallets.length === 1) {
+            await connectSelectedWallet(wallets[0]);
+            return;
+        }
+
+        setShowWalletChoices(true);
     };
 
     const copyWalletAddress = (address: string) => {
@@ -148,11 +270,27 @@ const WalletList: React.FC<WalletListProps> = ({ userId }) => {
                 <h4 className="text-lg font-medium text-gray-900 mb-2">No wallets connected</h4>
                 <p className="text-gray-500 mb-4">Connect your wallet to start using our services</p>
                 <button
-                    onClick={() => window.location.href = '/registration-payment'}
-                    className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
+                    onClick={handleConnectWallet}
+                    disabled={isConnecting}
+                    className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                    Connect Wallet
+                    {isConnecting ? 'Connecting...' : 'Connect Wallet'}
                 </button>
+                {showWalletChoices && availableWallets.length > 1 && (
+                    <div className="mt-4 flex flex-wrap justify-center gap-2">
+                        {availableWallets.map((wallet) => (
+                            <button
+                                key={wallet.name}
+                                onClick={() => connectSelectedWallet(wallet)}
+                                disabled={isConnecting}
+                                className="inline-flex items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-60"
+                            >
+                                <span>{wallet.icon}</span>
+                                <span>{wallet.name}</span>
+                            </button>
+                        ))}
+                    </div>
+                )}
             </div>
         );
     }

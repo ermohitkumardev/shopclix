@@ -133,7 +133,7 @@ Deno.serve(async (req: Request) => {
     }
 
     if (existingWallet?.tuwc_id) {
-      await supabase
+      const { error: updateWalletError } = await supabase
         .from('tbl_user_wallet_connections')
         .update({
           tuwc_is_active: true,
@@ -147,8 +147,12 @@ Deno.serve(async (req: Request) => {
         })
         .eq('tuwc_id', existingWallet.tuwc_id)
         .eq('tuwc_user_id', userId);
+
+      if (updateWalletError) {
+        throw updateWalletError;
+      }
     } else {
-      await supabase
+      const { error: insertWalletError } = await supabase
         .from('tbl_user_wallet_connections')
         .insert({
           tuwc_user_id: userId,
@@ -160,6 +164,10 @@ Deno.serve(async (req: Request) => {
           tuwc_is_default: true,
           tuwc_last_connected_at: new Date().toISOString(),
         });
+
+      if (insertWalletError) {
+        throw insertWalletError;
+      }
     }
 
     return new Response(JSON.stringify({ success: true }), {
@@ -168,7 +176,10 @@ Deno.serve(async (req: Request) => {
     });
   } catch (error: unknown) {
     console.error('upsert-wallet-connection error:', error);
-    const message = error instanceof Error ? error.message : 'Internal server error';
+    const rawMessage = error instanceof Error ? error.message : 'Internal server error';
+    const message = rawMessage.includes('wallet_unique_per_customer')
+      ? 'This wallet address is already linked to another customer.'
+      : rawMessage;
     return new Response(JSON.stringify({ success: false, error: message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

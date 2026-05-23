@@ -12,6 +12,7 @@ import PaymentHistory from '../../components/customer/PaymentHistory';
 import EarningsDashboard from '../../components/customer/EarningsDashboard';
 import WithdrawalsDashboard from '../../components/customer/WithdrawalsDashboard';
 import ProfileUpdateForm from '../../components/customer/ProfileUpdateForm';
+import PasswordUpdateForm from '../../components/customer/PasswordUpdateForm';
 import { useNotification } from '../../components/ui/NotificationProvider';
 import {
   Users,
@@ -608,6 +609,7 @@ const CustomerDashboard: React.FC = () => {
                 {activeTab === 'profile' && (
                     <div>
                       <ProfileUpdateForm />
+                      <PasswordUpdateForm />
                     </div>
                 )}
 
