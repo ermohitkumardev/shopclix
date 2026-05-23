@@ -132,12 +132,6 @@ const RegistrationPayment: React.FC = () => {
   const navigatingToSuccessRef = useRef(false);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const routeState = JSON.stringify({ path: '/registration-payment', savedAt: Date.now() });
-      sessionStorage.setItem(LAST_CUSTOMER_ROUTE_STORAGE_KEY, routeState);
-      localStorage.setItem(LAST_CUSTOMER_ROUTE_STORAGE_KEY, routeState);
-    }
-
     if (!user) {
       navigate('/customer/login');
       return;
@@ -155,6 +149,12 @@ const RegistrationPayment: React.FC = () => {
         navigate('/customer/dashboard', { replace: true });
       }
       return;
+    }
+
+    if (typeof window !== 'undefined') {
+      const routeState = JSON.stringify({ path: '/registration-payment', savedAt: Date.now() });
+      sessionStorage.setItem(LAST_CUSTOMER_ROUTE_STORAGE_KEY, routeState);
+      localStorage.setItem(LAST_CUSTOMER_ROUTE_STORAGE_KEY, routeState);
     }
 
     const loadRegistrationData = async () => {

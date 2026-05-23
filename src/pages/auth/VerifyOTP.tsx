@@ -23,7 +23,7 @@ interface CompletedVerifications {
 }
 
 const VerifyOTP: React.FC = () => {
-  const { user, fetchUserData } = useAuth();
+  const { user, fetchUserData, loading } = useAuth();
   const notification = useNotification();
   const navigate = useNavigate();
   const location = useLocation();
@@ -93,6 +93,27 @@ const VerifyOTP: React.FC = () => {
       mountedRef.current = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (loading || !user) return;
+
+    if (user.hasActiveSubscription || user.registrationPaid) {
+      navigate('/customer/dashboard', { replace: true });
+      return;
+    }
+
+    if (user.isVerified || user.mobileVerified) {
+      navigate('/registration-payment', { replace: true });
+    }
+  }, [
+    loading,
+    navigate,
+    user?.hasActiveSubscription,
+    user?.id,
+    user?.isVerified,
+    user?.mobileVerified,
+    user?.registrationPaid
+  ]);
 
   // Initialize component data - SINGLE INITIALIZATION
   useEffect(() => {
