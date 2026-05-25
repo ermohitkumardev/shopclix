@@ -1,4 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { otpEmailTemplate, sendSmtpMail } from '../_shared/email.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -19,79 +20,47 @@ const jsonResponse = (body: Record<string, unknown>, status = 200) =>
 
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
 
-const normalizeMobile = (value: string) => {
-  const compact = String(value || '').replace(/[\s()-]/g, '');
-  if (/^\+\d{10,15}$/.test(compact)) return compact;
-  if (/^\d{10}$/.test(compact)) return `+91${compact}`;
-  if (/^\d{11,15}$/.test(compact)) return `+${compact}`;
-  return compact;
+const normalizeEmail = (value: string) => String(value || '').trim().toLowerCase();
+const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+const maskEmail = (email: string) => {
+  const [name, domain] = email.split('@');
+  if (!name || !domain) return email;
+  const visibleName = name.length <= 2 ? name[0] : `${name.slice(0, 2)}***`;
+  return `${visibleName}@${domain}`;
 };
 
-async function sendSMSOTP(mobile: string, otp: string) {
-  const TWILIO_ACCOUNT_SID = Deno.env.get('TWILIO_ACCOUNT_SID');
-  const TWILIO_AUTH_TOKEN = Deno.env.get('TWILIO_AUTH_TOKEN');
-  const TWILIO_PHONE_NUMBER = Deno.env.get('TWILIO_PHONE_NUMBER');
+async function sendEmailOTP(email: string, otp: string) {
+  try {
+    await sendSmtpMail({
+      to: email,
+      subject: `Your Password Reset OTP - ${SITE_NAME}`,
+      html: otpEmailTemplate(otp),
+      text: `Your ${SITE_NAME} password reset OTP is ${otp}. This code expires in 10 minutes. Do not share this code with anyone.`,
+      fromName: `${SITE_NAME} Security`,
+    });
 
-  if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_PHONE_NUMBER) {
+    return { success: true };
+  } catch (error) {
     return {
       success: false,
-      error: 'SMS service is not configured.',
+      error: error instanceof Error ? error.message : 'Email send failed.',
     };
   }
-
-  const authHeader = btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`);
-  const message = `Your ${SITE_NAME} password reset OTP is: ${otp}. This code expires in 10 minutes. Do not share this code with anyone.`;
-
-  const response = await fetch(
-    `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Basic ${authHeader}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        From: TWILIO_PHONE_NUMBER,
-        To: mobile,
-        Body: message,
-      }).toString(),
-    },
-  );
-
-  if (!response.ok) {
-    let messageText = await response.text();
-    try {
-      messageText = JSON.parse(messageText)?.message || messageText;
-    } catch {
-      // keep raw Twilio error text
-    }
-    return {
-      success: false,
-      error: `SMS failed: ${messageText}`,
-    };
-  }
-
-  const result = await response.json();
-  return {
-    success: true,
-    messageSid: result.sid,
-  };
 }
 
-async function findCustomerBySponsorAndMobile(
+async function findCustomerBySponsorAndEmail(
   supabase: ReturnType<typeof createClient>,
   sponsorshipNumber: string,
-  mobile: string,
+  email: string,
 ) {
   const { data: profile, error: profileError } = await supabase
     .from('tbl_user_profiles')
-    .select('tup_user_id, tup_mobile, tup_sponsorship_number')
+    .select('tup_user_id, tup_sponsorship_number')
     .eq('tup_sponsorship_number', sponsorshipNumber)
     .maybeSingle();
 
   if (profileError) throw profileError;
-
-  if (!profile || normalizeMobile(profile.tup_mobile || '') !== mobile) {
+  if (!profile) {
     return null;
   }
 
@@ -102,13 +71,18 @@ async function findCustomerBySponsorAndMobile(
     .maybeSingle();
 
   if (userError) throw userError;
-  if (!user || user.tu_user_type !== 'customer' || user.tu_is_active === false) {
+  if (
+    !user ||
+    user.tu_user_type !== 'customer' ||
+    user.tu_is_active === false ||
+    normalizeEmail(user.tu_email || '') !== email
+  ) {
     return null;
   }
 
   return {
     userId: profile.tup_user_id,
-    mobile,
+    email,
   };
 }
 
@@ -133,20 +107,20 @@ Deno.serve(async (req: Request) => {
     const body = await req.json();
     const action = String(body.action || '');
     const sponsorshipNumber = String(body.sponsorshipNumber || '').trim();
-    const mobile = normalizeMobile(String(body.mobile || ''));
+    const email = normalizeEmail(String(body.email || ''));
 
-    if (!sponsorshipNumber || !/^\+\d{10,15}$/.test(mobile)) {
+    if (!sponsorshipNumber || !isValidEmail(email)) {
       return jsonResponse({
         success: false,
-        error: 'Enter a valid User ID and mobile number with country code.',
+        error: 'Enter a valid User ID and registered email address.',
       });
     }
 
-    const account = await findCustomerBySponsorAndMobile(supabase, sponsorshipNumber, mobile);
+    const account = await findCustomerBySponsorAndEmail(supabase, sponsorshipNumber, email);
     if (!account) {
       return jsonResponse({
         success: false,
-        error: 'No customer account matched this User ID and mobile number.',
+        error: 'No customer account matched this User ID and email address.',
       });
     }
 
@@ -155,8 +129,8 @@ Deno.serve(async (req: Request) => {
         .from('tbl_otp_verifications')
         .select('tov_created_at')
         .eq('tov_user_id', account.userId)
-        .eq('tov_otp_type', 'mobile')
-        .eq('tov_contact_info', account.mobile)
+        .eq('tov_otp_type', 'email')
+        .eq('tov_contact_info', account.email)
         .eq('tov_is_verified', false)
         .gte('tov_expires_at', new Date().toISOString())
         .order('tov_created_at', { ascending: false })
@@ -177,7 +151,7 @@ Deno.serve(async (req: Request) => {
         .from('tbl_otp_verifications')
         .update({ tov_is_verified: true, tov_updated_at: new Date().toISOString() })
         .eq('tov_user_id', account.userId)
-        .eq('tov_otp_type', 'mobile')
+        .eq('tov_otp_type', 'email')
         .eq('tov_is_verified', false);
 
       const otp = generateOTP();
@@ -187,8 +161,8 @@ Deno.serve(async (req: Request) => {
         .insert({
           tov_user_id: account.userId,
           tov_otp_code: otp,
-          tov_otp_type: 'mobile',
-          tov_contact_info: account.mobile,
+          tov_otp_type: 'email',
+          tov_contact_info: account.email,
           tov_expires_at: expiresAt,
           tov_is_verified: false,
           tov_attempts: 0,
@@ -198,19 +172,19 @@ Deno.serve(async (req: Request) => {
 
       if (insertError) throw insertError;
 
-      const smsResult = await sendSMSOTP(account.mobile, otp);
-      if (!smsResult.success) {
+      const emailResult = await sendEmailOTP(account.email, otp);
+      if (!emailResult.success) {
         await supabase
           .from('tbl_otp_verifications')
           .update({ tov_is_verified: true, tov_updated_at: new Date().toISOString() })
           .eq('tov_id', otpRecord.tov_id);
 
-        return jsonResponse({ success: false, error: smsResult.error });
+        return jsonResponse({ success: false, error: emailResult.error });
       }
 
       return jsonResponse({
         success: true,
-        message: `OTP sent to ${account.mobile.replace(/(.{3}).*(.{4})/, '$1***$2')}`,
+        message: `OTP sent to ${maskEmail(account.email)}`,
         expiresAt,
       });
     }
@@ -231,8 +205,8 @@ Deno.serve(async (req: Request) => {
         .from('tbl_otp_verifications')
         .select('tov_id, tov_attempts')
         .eq('tov_user_id', account.userId)
-        .eq('tov_otp_type', 'mobile')
-        .eq('tov_contact_info', account.mobile)
+        .eq('tov_otp_type', 'email')
+        .eq('tov_contact_info', account.email)
         .eq('tov_otp_code', otpCode)
         .eq('tov_is_verified', false)
         .gte('tov_expires_at', new Date().toISOString())
@@ -247,8 +221,8 @@ Deno.serve(async (req: Request) => {
           .from('tbl_otp_verifications')
           .select('tov_id, tov_attempts')
           .eq('tov_user_id', account.userId)
-          .eq('tov_otp_type', 'mobile')
-          .eq('tov_contact_info', account.mobile)
+          .eq('tov_otp_type', 'email')
+          .eq('tov_contact_info', account.email)
           .eq('tov_is_verified', false)
           .order('tov_created_at', { ascending: false })
           .limit(1)
@@ -291,7 +265,7 @@ Deno.serve(async (req: Request) => {
 
     return jsonResponse({ success: false, error: 'Invalid action.' });
   } catch (error: unknown) {
-    console.error('Password reset mobile error:', error);
+    console.error('Password reset email error:', error);
     const message = error instanceof Error ? error.message : 'Failed to reset password.';
     return jsonResponse({ success: false, error: message }, 500);
   }

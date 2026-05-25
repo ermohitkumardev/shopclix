@@ -2,20 +2,20 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAdmin } from '../../contexts/AdminContext';
-import { ArrowLeft, Eye, EyeOff, KeyRound, Lock, Shield, Smartphone, UserRound } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff, KeyRound, Lock, Mail, Shield, UserRound } from 'lucide-react';
 import ReCaptcha from '../../components/ui/ReCaptcha';
 import { verifyTurnstileToken } from '../../lib/turnstile';
 
 type ResetStep = 'identify' | 'reset' | 'done';
 
-const normalizeMobile = (value: string) => {
-  const compact = value.replace(/[\s()-]/g, '');
-  if (/^\d{10}$/.test(compact)) return `+91${compact}`;
-  if (/^\d{11,15}$/.test(compact)) return `+${compact}`;
-  return compact;
-};
+const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 
-const maskMobile = (mobile: string) => mobile.replace(/(.{3}).*(.{4})/, '$1***$2');
+const maskEmail = (email: string) => {
+  const [name, domain] = email.split('@');
+  if (!name || !domain) return email;
+  const visibleName = name.length <= 2 ? name[0] : `${name.slice(0, 2)}***`;
+  return `${visibleName}@${domain}`;
+};
 
 const getErrorMessage = (error: unknown, fallback: string) => {
   return error instanceof Error ? error.message : fallback;
@@ -27,7 +27,7 @@ const ForgotPassword: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     sponsorshipNumber: '',
-    mobile: '',
+    email: '',
     otp: '',
     password: '',
     confirmPassword: ''
@@ -38,7 +38,7 @@ const ForgotPassword: React.FC = () => {
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
-  const mobileForApi = normalizeMobile(formData.mobile.trim());
+  const emailForApi = formData.email.trim().toLowerCase();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -85,8 +85,8 @@ const ForgotPassword: React.FC = () => {
       return;
     }
 
-    if (!/^\+\d{10,15}$/.test(mobileForApi)) {
-      setError('Please enter a valid mobile number with country code.');
+    if (!isValidEmail(emailForApi)) {
+      setError('Please enter a valid registered email address.');
       return;
     }
 
@@ -95,9 +95,9 @@ const ForgotPassword: React.FC = () => {
       const data = await invokePasswordReset({
         action: 'request_reset',
         sponsorshipNumber: formData.sponsorshipNumber.trim(),
-        mobile: mobileForApi
+        email: emailForApi
       });
-      setSuccessMessage(data.message || `OTP sent to ${maskMobile(mobileForApi)}.`);
+      setSuccessMessage(data.message || `OTP sent to ${maskEmail(emailForApi)}.`);
       setStep('reset');
     } catch (err: unknown) {
       setError(getErrorMessage(err, 'Failed to send OTP. Please try again.'));
@@ -130,7 +130,7 @@ const ForgotPassword: React.FC = () => {
       await invokePasswordReset({
         action: 'reset_password',
         sponsorshipNumber: formData.sponsorshipNumber.trim(),
-        mobile: mobileForApi,
+        email: emailForApi,
         otp: formData.otp,
         newPassword: formData.password
       });
@@ -174,7 +174,7 @@ const ForgotPassword: React.FC = () => {
           <div className="text-center mb-8">
             <div className="bg-indigo-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
               {step === 'identify' ? (
-                <Smartphone className="h-8 w-8 text-indigo-600" />
+                <Mail className="h-8 w-8 text-indigo-600" />
               ) : (
                 <KeyRound className="h-8 w-8 text-indigo-600" />
               )}
@@ -182,8 +182,8 @@ const ForgotPassword: React.FC = () => {
             <h2 className="text-3xl font-bold text-gray-900">Forgot Password?</h2>
             <p className="mt-2 text-gray-600">
               {step === 'identify'
-                ? 'Enter your User ID and registered mobile number to receive an OTP.'
-                : `Enter the OTP sent to ${maskMobile(mobileForApi)} and choose a new password.`}
+                ? 'Enter your User ID and registered email address to receive an OTP.'
+                : `Enter the OTP sent to ${maskEmail(emailForApi)} and choose a new password.`}
             </p>
           </div>
 
@@ -223,26 +223,26 @@ const ForgotPassword: React.FC = () => {
               </div>
 
               <div>
-                <label htmlFor="mobile" className="block text-sm font-medium text-gray-700 mb-2">
-                  Registered Mobile Number
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                  Registered Email Address
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Smartphone className="h-5 w-5 text-gray-400" />
+                    <Mail className="h-5 w-5 text-gray-400" />
                   </div>
                   <input
-                    id="mobile"
-                    name="mobile"
-                    type="tel"
+                    id="email"
+                    name="email"
+                    type="email"
                     required
-                    value={formData.mobile}
+                    value={formData.email}
                     onChange={handleChange}
                     className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    placeholder="+91XXXXXXXXXX"
+                    placeholder="you@example.com"
                   />
                 </div>
                 <p className="mt-1 text-xs text-gray-500">
-                  Use the mobile number registered with this User ID.
+                  Use the email address registered with this User ID.
                 </p>
               </div>
 
@@ -259,7 +259,7 @@ const ForgotPassword: React.FC = () => {
                     <span>Sending OTP...</span>
                   </>
                 ) : (
-                  <span>Send Mobile OTP</span>
+                  <span>Send Email OTP</span>
                 )}
               </button>
             </form>
@@ -267,7 +267,7 @@ const ForgotPassword: React.FC = () => {
             <form onSubmit={handleResetPassword} className="space-y-6">
               <div>
                 <label htmlFor="otp" className="block text-sm font-medium text-gray-700 mb-2">
-                  Mobile OTP
+                  Email OTP
                 </label>
                 <input
                   id="otp"

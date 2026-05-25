@@ -44,7 +44,7 @@ const FAQ: React.FC = () => {
       },
       {
         question: "What if I forget my password?",
-        answer: "Use the 'Forgot Password' link on the login page. Enter your User ID and registered mobile number to receive a mobile OTP. Enter the OTP, choose a new password, and submit the reset form. If you don’t receive the OTP, check your mobile network and try resending it."
+        answer: "Use the 'Forgot Password' link on the login page. Enter your User ID and registered email address to receive an email OTP. Enter the OTP, choose a new password, and submit the reset form. If you don’t receive the OTP, check your inbox or spam folder and try resending it."
       },
       {
         question: "How do I update my profile information?",
