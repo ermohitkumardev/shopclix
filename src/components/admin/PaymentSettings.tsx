@@ -3,6 +3,14 @@ import { useAdmin } from '../../contexts/AdminContext';
 import { adminApi } from '../../lib/adminApi';
 import { Settings, Save, AlertCircle, CheckCircle } from 'lucide-react';
 
+const defaultPaymentWalletsEnabled = {
+    trust_wallet: true,
+    metamask: true,
+    safepal: true,
+    tokenpocket: true,
+    bitget: true
+};
+
 const PaymentSettings: React.FC = () => {
     const { settings, updateSettings, loading, refreshSettings } = useAdmin();
     const [formData, setFormData] = useState({
@@ -22,10 +30,9 @@ const PaymentSettings: React.FC = () => {
         withdrawalProcessingDays: settings.withdrawalProcessingDays,
         withdrawalEnabled: settings.withdrawalEnabled,
         withdrawalDisabledMessage: settings.withdrawalDisabledMessage,
-        paymentWalletsEnabled: settings.paymentWalletsEnabled || {
-            trust_wallet: true,
-            metamask: true,
-            safepal: true
+        paymentWalletsEnabled: {
+            ...defaultPaymentWalletsEnabled,
+            ...settings.paymentWalletsEnabled
         }
     });
     const [saving, setSaving] = useState(false);
@@ -49,10 +56,9 @@ const PaymentSettings: React.FC = () => {
             withdrawalProcessingDays: settings.withdrawalProcessingDays,
             withdrawalEnabled: settings.withdrawalEnabled,
             withdrawalDisabledMessage: settings.withdrawalDisabledMessage,
-            paymentWalletsEnabled: settings.paymentWalletsEnabled || {
-                trust_wallet: true,
-                metamask: true,
-                safepal: true
+            paymentWalletsEnabled: {
+                ...defaultPaymentWalletsEnabled,
+                ...settings.paymentWalletsEnabled
             }
         });
     }, [settings]);
@@ -165,7 +171,7 @@ const PaymentSettings: React.FC = () => {
         }));
     };
 
-    const handleWalletToggle = (walletKey: 'trust_wallet' | 'metamask' | 'safepal') => {
+    const handleWalletToggle = (walletKey: keyof typeof defaultPaymentWalletsEnabled) => {
         setFormData(prev => ({
             ...prev,
             paymentWalletsEnabled: {
@@ -349,6 +355,24 @@ const PaymentSettings: React.FC = () => {
                                     className="h-4 w-4 text-blue-600 border-gray-300 rounded"
                                 />
                                 SafePal
+                            </label>
+                            <label className="flex items-center gap-2 text-sm text-gray-700">
+                                <input
+                                    type="checkbox"
+                                    checked={formData.paymentWalletsEnabled.tokenpocket}
+                                    onChange={() => handleWalletToggle('tokenpocket')}
+                                    className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                                />
+                                TokenPocket
+                            </label>
+                            <label className="flex items-center gap-2 text-sm text-gray-700">
+                                <input
+                                    type="checkbox"
+                                    checked={formData.paymentWalletsEnabled.bitget}
+                                    onChange={() => handleWalletToggle('bitget')}
+                                    className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                                />
+                                Bitget Wallet
                             </label>
                         </div>
                     </div>

@@ -17,6 +17,8 @@ export const WalletSelector: React.FC<WalletSelectorProps> = ({
     { name: 'MetaMask', url: 'https://metamask.io/download/', icon: '🦊' },
     { name: 'Trust Wallet', url: 'https://trustwallet.com/', icon: '🔷' },
     { name: 'SafePal', url: 'https://safepal.io/', icon: '🛡️' },
+    { name: 'TokenPocket', url: 'https://www.tokenpocket.pro/', icon: 'TP' },
+    { name: 'Bitget Wallet', url: 'https://web3.bitget.com/en/wallet-download', icon: 'BG' },
   ];
 
   return (

@@ -3,7 +3,16 @@ interface Window {
         isMetaMask?: boolean;
         isTrust?: boolean;
         isSafePal?: boolean;
+        isTokenPocket?: boolean;
+        isBitKeep?: boolean;
+        isBitget?: boolean;
         request?: (args: { method: string; params?: any[] }) => Promise<any>;
+    };
+    tokenpocket?: {
+        ethereum?: Window['ethereum'];
+    };
+    bitkeep?: {
+        ethereum?: Window['ethereum'];
     };
     turnstile?: {
         render: (

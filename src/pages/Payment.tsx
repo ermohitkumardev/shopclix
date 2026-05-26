@@ -30,8 +30,10 @@ const PAYMENT_SUCCESS_KEY = 'payment_success_state';
 // Helper function to determine wallet type from provider
 const getWalletType = (provider: any): string => {
   if (provider.isMetaMask) return 'metamask';
-  if (provider.isTrust) return 'trust';
+  if (provider.isTrust || provider.isTrustWallet) return 'trust';
   if (provider.isSafePal) return 'safepal';
+  if (provider.isTokenPocket) return 'tokenpocket';
+  if (provider.isBitKeep || provider.isBitget || provider === (window as any).bitkeep?.ethereum) return 'bitget';
   if (provider.isBinanceChain || provider.isBinance) return 'binance';
   return 'web3';
 };
@@ -828,6 +830,10 @@ const Payment: React.FC = () => {
         provider = (window as any).ethereum;
       } else if (walletType === 'safepal' && (window as any).ethereum?.isSafePal) {
         provider = (window as any).ethereum;
+      } else if (walletType === 'tokenpocket' && ((window as any).ethereum?.isTokenPocket || (window as any).tokenpocket?.ethereum)) {
+        provider = (window as any).tokenpocket?.ethereum || (window as any).ethereum;
+      } else if (walletType === 'bitget' && ((window as any).ethereum?.isBitKeep || (window as any).ethereum?.isBitget || (window as any).bitkeep?.ethereum)) {
+        provider = (window as any).bitkeep?.ethereum || (window as any).ethereum;
       } else if (walletType === 'binance' && (window as any).BinanceChain) {
         provider = (window as any).BinanceChain;
       } else if ((window as any).ethereum) {

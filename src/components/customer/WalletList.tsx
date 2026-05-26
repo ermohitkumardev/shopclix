@@ -103,6 +103,8 @@ const WalletList: React.FC<WalletListProps> = ({ userId }) => {
         if (provider?.isMetaMask) return 'metamask';
         if (provider?.isTrust || provider?.isTrustWallet) return 'trust';
         if (provider?.isSafePal) return 'safepal';
+        if (provider?.isTokenPocket) return 'tokenpocket';
+        if (provider?.isBitKeep || provider?.isBitget || provider === (window as any).bitkeep?.ethereum) return 'bitget';
         if (provider?.isBinanceChain || provider?.isBinance) return 'binance';
         return 'web3';
     };
@@ -237,6 +239,8 @@ const WalletList: React.FC<WalletListProps> = ({ userId }) => {
             'metamask': 'MetaMask',
             'trust': 'Trust Wallet',
             'safepal': 'SafePal',
+            'tokenpocket': 'TokenPocket',
+            'bitget': 'Bitget Wallet',
             'binance': 'Binance Chain Wallet',
             'web3': 'Web3 Wallet'
         };

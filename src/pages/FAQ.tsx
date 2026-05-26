@@ -54,7 +54,7 @@ const FAQ: React.FC = () => {
     payments: [
       {
         question: "What payment methods do you accept?",
-        answer: "We currently accept cryptocurrency payments in USDT (BEP20 / Binance Smart Chain). You can pay using supported wallets like MetaMask, Trust Wallet, or SafePal."
+        answer: "We currently accept cryptocurrency payments in USDT (BEP20 / Binance Smart Chain). You can pay using supported wallets like MetaMask, Trust Wallet, SafePal, TokenPocket, or Bitget Wallet."
       },
       {
         question: "When and how are commissions paid?",
