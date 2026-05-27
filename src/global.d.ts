@@ -14,6 +14,13 @@ interface Window {
     bitkeep?: {
         ethereum?: Window['ethereum'];
     };
+    bitget?: {
+        ethereum?: Window['ethereum'];
+    };
+    bitgetWallet?: Window['ethereum'];
+    BitKeep?: {
+        ethereum?: Window['ethereum'];
+    };
     turnstile?: {
         render: (
             container: string | HTMLElement,

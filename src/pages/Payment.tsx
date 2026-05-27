@@ -32,8 +32,24 @@ const getWalletType = (provider: any): string => {
   if (provider.isMetaMask) return 'metamask';
   if (provider.isTrust || provider.isTrustWallet) return 'trust';
   if (provider.isSafePal) return 'safepal';
-  if (provider.isTokenPocket) return 'tokenpocket';
-  if (provider.isBitKeep || provider.isBitget || provider === (window as any).bitkeep?.ethereum) return 'bitget';
+  if (provider.isTokenPocket || provider.isTp || provider.isTP) return 'tokenpocket';
+  if (
+    provider.isBitKeep ||
+    provider.isBitkeep ||
+    provider.isBitKeepChrome ||
+    provider.isBitget ||
+    provider.isBitgetWallet ||
+    provider === (window as any).bitkeep?.ethereum ||
+    provider === (window as any).bitkeep?.ethereumProvider ||
+    provider === (window as any).bitkeep ||
+    provider === (window as any).bitget?.ethereum ||
+    provider === (window as any).bitget?.ethereumProvider ||
+    provider === (window as any).bitget ||
+    provider === (window as any).BitKeep?.ethereum ||
+    provider === (window as any).BitKeep?.ethereumProvider ||
+    provider === (window as any).BitKeep ||
+    provider === (window as any).bitgetWallet
+  ) return 'bitget';
   if (provider.isBinanceChain || provider.isBinance) return 'binance';
   return 'web3';
 };
@@ -219,7 +235,7 @@ const Payment: React.FC = () => {
 
     refreshDetectedWallets();
 
-    const timeoutIds = [250, 1000, 2500].map((delay) =>
+    const timeoutIds = [250, 1000, 2500, 5000].map((delay) =>
       window.setTimeout(refreshDetectedWallets, delay)
     );
 
@@ -832,8 +848,8 @@ const Payment: React.FC = () => {
         provider = (window as any).ethereum;
       } else if (walletType === 'tokenpocket' && ((window as any).ethereum?.isTokenPocket || (window as any).tokenpocket?.ethereum)) {
         provider = (window as any).tokenpocket?.ethereum || (window as any).ethereum;
-      } else if (walletType === 'bitget' && ((window as any).ethereum?.isBitKeep || (window as any).ethereum?.isBitget || (window as any).bitkeep?.ethereum)) {
-        provider = (window as any).bitkeep?.ethereum || (window as any).ethereum;
+      } else if (walletType === 'bitget' && ((window as any).ethereum?.isBitKeep || (window as any).ethereum?.isBitkeep || (window as any).ethereum?.isBitKeepChrome || (window as any).ethereum?.isBitget || (window as any).ethereum?.isBitgetWallet || (window as any).bitkeep?.ethereum || (window as any).bitkeep?.ethereumProvider || (window as any).bitkeep?.request || (window as any).bitget?.ethereum || (window as any).bitget?.ethereumProvider || (window as any).bitget?.request || (window as any).BitKeep?.ethereum || (window as any).BitKeep?.ethereumProvider || (window as any).BitKeep?.request || (window as any).bitgetWallet)) {
+        provider = (window as any).bitkeep?.ethereum || (window as any).bitkeep?.ethereumProvider || (window as any).bitkeep || (window as any).bitget?.ethereum || (window as any).bitget?.ethereumProvider || (window as any).bitget || (window as any).BitKeep?.ethereum || (window as any).BitKeep?.ethereumProvider || (window as any).BitKeep || (window as any).bitgetWallet || (window as any).ethereum;
       } else if (walletType === 'binance' && (window as any).BinanceChain) {
         provider = (window as any).BinanceChain;
       } else if ((window as any).ethereum) {
