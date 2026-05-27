@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useAdmin } from '../contexts/AdminContext';
@@ -106,6 +106,26 @@ const Payment: React.FC = () => {
 
   const [isConnecting, setIsConnecting] = useState(false);
   const [lastConnectedWallet, setLastConnectedWallet] = useState<any>(null);
+
+  const enabledWallets = useMemo(() => ({
+    trust_wallet: true,
+    metamask: true,
+    safepal: true,
+    tokenpocket: true,
+    bitget: true,
+    ...settings?.paymentWalletsEnabled,
+  }), [settings?.paymentWalletsEnabled]);
+
+  const filteredWallets = useMemo(() => {
+    return availableWallets.filter((wallet) => {
+      if (wallet.name === 'Trust Wallet') return enabledWallets.trust_wallet;
+      if (wallet.name === 'MetaMask') return enabledWallets.metamask;
+      if (wallet.name === 'SafePal') return enabledWallets.safepal;
+      if (wallet.name === 'TokenPocket') return enabledWallets.tokenpocket;
+      if (wallet.name === 'Bitget Wallet') return enabledWallets.bitget;
+      return true;
+    });
+  }, [availableWallets, enabledWallets]);
 
   // FIX: If the user has an active plan (from DB check), force success status.
   // Otherwise, rely on the session storage flag.
@@ -983,7 +1003,7 @@ const Payment: React.FC = () => {
                       Connect Your Wallet
                     </h2>
 
-                    {availableWallets.length === 0 && (
+                    {filteredWallets.length === 0 && (
                         <div className="bg-yellow-500/20 border border-yellow-400/30 rounded-xl p-4 mb-6">
                           <div className="flex items-center space-x-2 mb-2">
                             <AlertTriangle className="h-5 w-5 text-yellow-300" />
@@ -1019,7 +1039,7 @@ const Payment: React.FC = () => {
                     )}
 
 	                    <WalletSelector
-	                        wallets={availableWallets}
+	                        wallets={filteredWallets}
 	                        onConnect={handleWalletConnect}
 	                        isConnecting={isConnecting}
 	                    />

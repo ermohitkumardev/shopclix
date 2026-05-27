@@ -140,6 +140,11 @@ const normalizeProviderRequest = (provider: any): any => {
   };
 };
 
+const normalizeUsableProvider = (provider: any): any | null => {
+  const normalizedProvider = normalizeProviderRequest(provider);
+  return hasProviderRequest(normalizedProvider) ? normalizedProvider : null;
+};
+
 const getEthereumProviderList = (ethereum: any): any[] => {
   try {
     return Array.isArray(ethereum?.providers) ? ethereum.providers : [];
@@ -346,16 +351,16 @@ export class WalletService {
     const BitKeep = (window as any).BitKeep;
 
     return (
-      normalizeProviderRequest(bitkeep?.ethereum) ||
-      normalizeProviderRequest(bitkeep?.ethereumProvider) ||
-      (hasProviderRequest(bitkeep) || hasLegacyProviderRequest(bitkeep) ? normalizeProviderRequest(bitkeep) : null) ||
-      normalizeProviderRequest(bitget?.ethereum) ||
-      normalizeProviderRequest(bitget?.ethereumProvider) ||
-      (hasProviderRequest(bitget) || hasLegacyProviderRequest(bitget) ? normalizeProviderRequest(bitget) : null) ||
-      normalizeProviderRequest(BitKeep?.ethereum) ||
-      normalizeProviderRequest(BitKeep?.ethereumProvider) ||
-      (hasProviderRequest(BitKeep) || hasLegacyProviderRequest(BitKeep) ? normalizeProviderRequest(BitKeep) : null) ||
-      (window as any).bitgetWallet ||
+      normalizeUsableProvider(bitkeep?.ethereum) ||
+      normalizeUsableProvider(bitkeep?.ethereumProvider) ||
+      normalizeUsableProvider(bitkeep) ||
+      normalizeUsableProvider(bitget?.ethereum) ||
+      normalizeUsableProvider(bitget?.ethereumProvider) ||
+      normalizeUsableProvider(bitget) ||
+      normalizeUsableProvider(BitKeep?.ethereum) ||
+      normalizeUsableProvider(BitKeep?.ethereumProvider) ||
+      normalizeUsableProvider(BitKeep) ||
+      normalizeUsableProvider((window as any).bitgetWallet) ||
       null
     );
   }
@@ -379,7 +384,7 @@ export class WalletService {
           rdns.includes('bitkeep')
         )
       ) {
-        return provider;
+        return normalizeUsableProvider(provider);
       }
     }
 
@@ -405,76 +410,6 @@ export class WalletService {
     }
 
     return normalizeProviderRequest(ethereum);
-  }
-
-  private createLazyBitgetProvider(): any {
-    const buildBitgetUnavailableMessage = () => {
-      const hasWindowEthereum = Boolean((window as any).ethereum);
-      const ethereumProviders = Array.isArray((window as any).ethereum?.providers)
-        ? (window as any).ethereum.providers.length
-        : 0;
-
-      return [
-        'Bitget Wallet extension is open, but it has not injected its dApp provider into this page.',
-        'Bitget requires window.bitkeep.ethereum for web dApp connections.',
-        `Detected: window.bitkeep.ethereum=${Boolean((window as any).bitkeep?.ethereum)}, window.ethereum=${hasWindowEthereum}, ethereum.providers=${ethereumProviders}.`,
-        'In Chrome, open chrome://extensions, Bitget Wallet > Details, set Site access to "On all sites" or allow http://localhost:5173, then turn off other wallet extensions temporarily and refresh.'
-      ].join(' ');
-    };
-
-    return {
-      isBitgetWallet: true,
-      isLazyBitgetProvider: true,
-      request: async (args: { method: string; params?: any[] }) => {
-        this.requestEip6963Providers();
-        await new Promise((resolve) => window.setTimeout(resolve, 250));
-        const provider = this.getDetectedBitgetProvider() || this.getSingleInjectedEthereumProvider();
-        if (!hasProviderRequest(provider)) {
-          console.warn('Bitget provider diagnostics:', {
-            bitkeep: Boolean((window as any).bitkeep),
-            bitkeepEthereum: Boolean((window as any).bitkeep?.ethereum),
-            bitget: Boolean((window as any).bitget),
-            bitgetEthereum: Boolean((window as any).bitget?.ethereum),
-            bitgetWallet: Boolean((window as any).bitgetWallet),
-            ethereum: Boolean((window as any).ethereum),
-            ethereumRequest: hasProviderRequest((window as any).ethereum),
-            ethereumSend: (() => {
-              try {
-                return typeof (window as any).ethereum?.send === 'function';
-              } catch {
-                return false;
-              }
-            })(),
-            ethereumSendAsync: (() => {
-              try {
-                return typeof (window as any).ethereum?.sendAsync === 'function';
-              } catch {
-                return false;
-              }
-            })(),
-            ethereumProviderCount: getEthereumProviderList((window as any).ethereum).length,
-            eip6963Providers: this.eip6963Providers.map((detail) => ({
-              name: detail.info?.name,
-              rdns: detail.info?.rdns,
-              uuid: detail.info?.uuid,
-            })),
-          });
-          throw new Error(buildBitgetUnavailableMessage());
-        }
-        return provider.request(args);
-      },
-      enable: async () => {
-        this.requestEip6963Providers();
-        await new Promise((resolve) => window.setTimeout(resolve, 250));
-        const provider = this.getDetectedBitgetProvider() || this.getSingleInjectedEthereumProvider();
-        if (!provider) {
-          throw new Error(buildBitgetUnavailableMessage());
-        }
-        if (typeof provider.enable === 'function') return provider.enable();
-        if (typeof provider.request === 'function') return provider.request({ method: 'eth_requestAccounts' });
-        throw new Error('Bitget Wallet provider does not support account requests.');
-      },
-    };
   }
 
   private providerHasWalletMarker(provider: any, markers: string[]): boolean {
@@ -505,7 +440,6 @@ export class WalletService {
       getProviderFlag(provider, 'isBitKeepChrome') ||
       getProviderFlag(provider, 'isBitget') ||
       getProviderFlag(provider, 'isBitgetWallet') ||
-      provider?.isLazyBitgetProvider ||
       provider === this.getBitgetProvider() ||
       this.providerHasWalletMarker(provider, ['bitkeep', 'bitget'])
     );
@@ -656,6 +590,10 @@ export class WalletService {
     const inAppWalletName = this.getInAppWalletName();
     if (inAppWalletName && this.isMobileBrowser()) {
       const provider = this.findProviderByWalletName(inAppWalletName) || (window as any).ethereum;
+      if (inAppWalletName === 'Bitget Wallet' && !normalizeUsableProvider(provider)) {
+        console.log('Detected Bitget mobile browser, but no usable Bitget provider is available.');
+        return wallets;
+      }
       wallets.push({
         name: inAppWalletName,
         icon: this.getWalletIcon(inAppWalletName),
@@ -677,7 +615,7 @@ export class WalletService {
     const safePalProvider = providers.find((provider) => getProviderFlag(provider, 'isSafePal'));
     const trustProvider = providers.find((provider) => getProviderFlag(provider, 'isTrust') || getProviderFlag(provider, 'isTrustWallet'));
     const tokenPocketProvider = providers.find((provider) => this.isTokenPocketProvider(provider));
-    const bitgetProvider = providers.find((provider) => this.isBitgetProvider(provider)) || this.getDetectedBitgetProvider();
+    const bitgetProvider = normalizeUsableProvider(providers.find((provider) => this.isBitgetProvider(provider))) || this.getDetectedBitgetProvider();
     const metaMaskProvider = providers.find((provider) =>
       getProviderFlag(provider, 'isMetaMask') &&
       !getProviderFlag(provider, 'isSafePal') &&
@@ -716,12 +654,12 @@ export class WalletService {
       }, seenNames, seenProviders);
     }
 
-    if (bitgetProvider || !seenNames.has('Bitget Wallet')) {
+    if (bitgetProvider) {
       this.addWalletIfAvailable(wallets, {
         name: 'Bitget Wallet',
         icon: 'BG',
         isInstalled: true,
-        provider: bitgetProvider || this.createLazyBitgetProvider(),
+        provider: bitgetProvider,
       }, seenNames, seenProviders);
     }
 
