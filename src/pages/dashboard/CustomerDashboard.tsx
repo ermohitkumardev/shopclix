@@ -489,26 +489,17 @@ const CustomerDashboard: React.FC = () => {
                               ? 'bg-indigo-50 text-indigo-700 border-r-2 border-indigo-600'
                               : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                       }`}
-	                  >
-	                    <Icon className="h-5 w-5 flex-shrink-0" />
-	                    <div className="flex-1 flex items-center justify-between min-w-0">
-	                      <span className="font-medium truncate">{item.label}</span>
-	                      {item.badge && (
-	                        <span className="ml-2 inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-semibold text-yellow-800">
-	                          {item.badge}
-	                        </span>
-		                          )}
-                          {spinWheelVisible && (
-                            <button
-                              onClick={() => setActiveTab('spin-wheel')}
-                              className="w-full bg-teal-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-teal-700 transition-colors flex items-center justify-center space-x-2"
-                            >
-                              <Gift className="h-4 w-4" />
-                              <span>Spin the Wheel</span>
-                            </button>
+                      >
+                        <Icon className="h-5 w-5 flex-shrink-0" />
+                        <div className="flex-1 flex items-center justify-between min-w-0">
+                          <span className="font-medium truncate">{item.label}</span>
+                          {item.badge && (
+                            <span className="ml-2 inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-semibold text-yellow-800">
+                              {item.badge}
+                            </span>
                           )}
                         </div>
-	                  </button>
+                      </button>
 	              );
 	            })}
 	          </nav>
