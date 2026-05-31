@@ -10,10 +10,13 @@ import { sendAccountEmail } from '../../utils/accountEmails';
 
 const countryCodes = [
   { code: '+91', country: 'India', flag: '🇮🇳' },
+  { code: '+92', country: 'Pakistan', flag: '🇵🇰' },
   { code: '+972', country: 'Israel', flag: '🇮🇱' },
   { code: '+1', country: 'United States', flag: '🇺🇸' },
+  { code: '+1', country: 'Canada', flag: '🇨🇦' },
   { code: '+44', country: 'United Kingdom', flag: '🇬🇧' },
   { code: '+61', country: 'Australia', flag: '🇦🇺' },
+  { code: '+64', country: 'New Zealand', flag: '🇳🇿' },
   { code: '+86', country: 'China', flag: '🇨🇳' },
   { code: '+49', country: 'Germany', flag: '🇩🇪' },
   { code: '+33', country: 'France', flag: '🇫🇷' },
