@@ -687,11 +687,14 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         };
 
         const paymentModeValue = mergedBase.paymentMode;
+        const normalizedPaymentMode = String(paymentModeValue ?? '').trim().toLowerCase();
         const isLive =
           paymentModeValue === true ||
           paymentModeValue === 1 ||
-          paymentModeValue === '1' ||
-          paymentModeValue === 'true';
+          normalizedPaymentMode === '1' ||
+          normalizedPaymentMode === 'true' ||
+          normalizedPaymentMode === 'live' ||
+          normalizedPaymentMode === 'mainnet';
 
         const effectiveUsdtAddress = isLive
           ? (mergedBase.usdtAddressMainnet || mergedBase.usdtAddress || defaultSettings.usdtAddress)

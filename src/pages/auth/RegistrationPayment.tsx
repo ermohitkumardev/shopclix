@@ -57,6 +57,11 @@ const clearPendingTxHash = () => {
   } catch { /* ignore */ }
 };
 
+const isLivePaymentModeValue = (paymentMode: unknown): boolean => {
+  const normalized = String(paymentMode ?? '').trim().toLowerCase();
+  return paymentMode === true || paymentMode === 1 || normalized === '1' || normalized === 'true' || normalized === 'live' || normalized === 'mainnet';
+};
+
 const isAlreadyProcessedRegistrationPayment = (value: any) => {
   const message = String(
     value?.error ||
@@ -425,6 +430,9 @@ const RegistrationPayment: React.FC = () => {
     const refreshDetectedWallets = () => {
       setAvailableWallets(walletService.detectWallets());
     };
+    const refreshDetectedWalletsFromAnnouncement = () => {
+      setAvailableWallets(walletService.detectWallets({ requestEip6963: false }));
+    };
 
     refreshDetectedWallets();
 
@@ -435,12 +443,14 @@ const RegistrationPayment: React.FC = () => {
     window.addEventListener('load', refreshDetectedWallets);
     window.addEventListener('focus', refreshDetectedWallets);
     window.addEventListener('ethereum#initialized', refreshDetectedWallets as EventListener);
+    window.addEventListener('eip6963:announceProvider', refreshDetectedWalletsFromAnnouncement as EventListener);
 
     return () => {
       timeoutIds.forEach((id) => window.clearTimeout(id));
       window.removeEventListener('load', refreshDetectedWallets);
       window.removeEventListener('focus', refreshDetectedWallets);
       window.removeEventListener('ethereum#initialized', refreshDetectedWallets as EventListener);
+      window.removeEventListener('eip6963:announceProvider', refreshDetectedWalletsFromAnnouncement as EventListener);
     };
   }, [walletService]);
 
@@ -599,6 +609,10 @@ const RegistrationPayment: React.FC = () => {
 
   const handleWalletConnect = useCallback(async (provider: any) => {
     if (isConnecting) return;
+    if (settingsLoading) {
+      notification.showError('Please Wait', 'Payment settings are still loading. Please try again in a moment.');
+      return;
+    }
 
 		    setIsConnecting(true);
 		    try {
@@ -821,11 +835,7 @@ const RegistrationPayment: React.FC = () => {
   };
 
   const safeSerializeGatewayResponse = (error: any, txHash: string | null, steps: string[]) => {
-    const isLivePaymentMode =
-      settings?.paymentMode === true ||
-      settings?.paymentMode === 1 ||
-      settings?.paymentMode === '1' ||
-      settings?.paymentMode === 'true';
+    const isLivePaymentMode = isLivePaymentModeValue(settings?.paymentMode);
     const gatewayResponse = error?.gatewayResponse || error?.response?.data || error?.data || error?.info || null;
     const rawError: Record<string, any> = {};
 
@@ -884,11 +894,7 @@ const RegistrationPayment: React.FC = () => {
     const walletErrorRaw = buildRawWalletError(error);
     const paymentStatus = txHash ? 'pending' : 'failed';
     const gatewayResponse = safeSerializeGatewayResponse(error, txHash, steps);
-    const isLivePaymentMode =
-      settings?.paymentMode === true ||
-      settings?.paymentMode === 1 ||
-      settings?.paymentMode === '1' ||
-      settings?.paymentMode === 'true';
+    const isLivePaymentMode = isLivePaymentModeValue(settings?.paymentMode);
 
     const deviceInfo = typeof navigator !== 'undefined'
       ? navigator.userAgent.substring(0, 200)
@@ -1734,11 +1740,7 @@ const RegistrationPayment: React.FC = () => {
 
   const openTransaction = () => {
     if (!transaction.hash) return;
-    const isMainnet =
-      settings?.paymentMode === true ||
-      settings?.paymentMode === 1 ||
-      settings?.paymentMode === '1' ||
-      settings?.paymentMode === 'true';
+    const isMainnet = isLivePaymentModeValue(settings?.paymentMode);
     const explorerUrl = isMainnet
       ? `https://bscscan.com/tx/${transaction.hash}`
       : `https://testnet.bscscan.com/tx/${transaction.hash}`;
@@ -1946,7 +1948,7 @@ const RegistrationPayment: React.FC = () => {
                         <button
                           key={wallet.name}
                           onClick={() => handleWalletConnect(wallet.provider)}
-                          disabled={isConnecting || !!parentAccountError}
+                          disabled={settingsLoading || isConnecting || !!parentAccountError}
                           className="p-4 border-2 rounded-lg transition-all border-gray-200 hover:border-blue-400 bg-white"
                         >
                           <div className="text-2xl mb-2">{wallet.icon}</div>
@@ -2139,10 +2141,7 @@ const RegistrationPayment: React.FC = () => {
                 <div className="flex justify-between">
                   <span>Network</span>
                   <span className="font-medium">
-                    {settings?.paymentMode === true ||
-                    settings?.paymentMode === 1 ||
-                    settings?.paymentMode === '1' ||
-                    settings?.paymentMode === 'true'
+                    {isLivePaymentModeValue(settings?.paymentMode)
                       ? 'BSC Mainnet'
                       : 'BSC Testnet'}
                   </span>

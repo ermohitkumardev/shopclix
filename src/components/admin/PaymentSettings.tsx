@@ -11,6 +11,11 @@ const defaultPaymentWalletsEnabled = {
     bitget: true
 };
 
+const isLivePaymentModeValue = (paymentMode: unknown): boolean => {
+    const normalized = String(paymentMode ?? '').trim().toLowerCase();
+    return paymentMode === true || paymentMode === 1 || normalized === '1' || normalized === 'true' || normalized === 'live' || normalized === 'mainnet';
+};
+
 const PaymentSettings: React.FC = () => {
     const { settings, updateSettings, loading, refreshSettings } = useAdmin();
     const [formData, setFormData] = useState({
@@ -74,11 +79,13 @@ const PaymentSettings: React.FC = () => {
         setSaveResult(null);
 
         try {
+            const isLivePaymentMode = isLivePaymentModeValue(formData.paymentMode);
+
             // Update settings in database
             const updates = [
                 { key: 'payment_mode', value: JSON.stringify(formData.paymentMode) },
                 // Keep legacy key in sync with selected mode (backward compatibility)
-                { key: 'usdt_address', value: JSON.stringify(String(formData.paymentMode) === '1' ? formData.usdtAddressMainnet : formData.usdtAddressTestnet) },
+                { key: 'usdt_address', value: JSON.stringify(isLivePaymentMode ? formData.usdtAddressMainnet : formData.usdtAddressTestnet) },
                 { key: 'usdt_address_testnet', value: JSON.stringify(formData.usdtAddressTestnet) },
                 { key: 'usdt_address_mainnet', value: JSON.stringify(formData.usdtAddressMainnet) },
                 { key: 'subscription_contract_address', value: JSON.stringify(formData.subscriptionContractAddress) },
@@ -86,7 +93,7 @@ const PaymentSettings: React.FC = () => {
                 { key: 'subscription_wallet_address', value: JSON.stringify(formData.subscriptionWalletAddress) },
                 { key: 'investment_wallet_address', value: JSON.stringify(formData.investmentWalletAddress) },
                 // Keep legacy key in sync with selected mode (backward compatibility)
-                { key: 'admin_payment_wallet', value: JSON.stringify(String(formData.paymentMode) === '1' ? formData.adminPaymentWalletMainnet : formData.adminPaymentWalletTestnet) },
+                { key: 'admin_payment_wallet', value: JSON.stringify(isLivePaymentMode ? formData.adminPaymentWalletMainnet : formData.adminPaymentWalletTestnet) },
                 { key: 'admin_payment_wallet_testnet', value: JSON.stringify(formData.adminPaymentWalletTestnet || '') },
                 { key: 'admin_payment_wallet_mainnet', value: JSON.stringify(formData.adminPaymentWalletMainnet || '') },
                 { key: 'payment_wallets_enabled', value: JSON.stringify(formData.paymentWalletsEnabled) },
@@ -115,8 +122,8 @@ const PaymentSettings: React.FC = () => {
                 adminPaymentWalletTestnet: formData.adminPaymentWalletTestnet,
                 adminPaymentWalletMainnet: formData.adminPaymentWalletMainnet,
                 // effective values (AdminContext will also recompute after refresh)
-                usdtAddress: String(formData.paymentMode) === '1' ? formData.usdtAddressMainnet : formData.usdtAddressTestnet,
-                adminPaymentWallet: String(formData.paymentMode) === '1' ? formData.adminPaymentWalletMainnet : formData.adminPaymentWalletTestnet,
+                usdtAddress: isLivePaymentMode ? formData.usdtAddressMainnet : formData.usdtAddressTestnet,
+                adminPaymentWallet: isLivePaymentMode ? formData.adminPaymentWalletMainnet : formData.adminPaymentWalletTestnet,
                 subscriptionContractAddress: formData.subscriptionContractAddress,
                 investmentContractAddress: formData.investmentContractAddress,
                 subscriptionWalletAddress: formData.subscriptionWalletAddress,

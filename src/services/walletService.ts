@@ -255,7 +255,8 @@ export class WalletService {
   }
 
   private isLivePaymentMode(paymentMode: AdminSettings['paymentMode'] | undefined | null): boolean {
-    return paymentMode === true || paymentMode === 1 || paymentMode === '1' || paymentMode === 'true';
+    const normalized = String(paymentMode ?? '').trim().toLowerCase();
+    return paymentMode === true || paymentMode === 1 || normalized === '1' || normalized === 'true' || normalized === 'live' || normalized === 'mainnet';
   }
 
   private getExpectedChainId(): number {
@@ -445,13 +446,15 @@ export class WalletService {
     );
   }
 
-  private requestEip6963Providers(): Eip6963ProviderDetail[] {
+  private requestEip6963Providers(shouldRequest = true): Eip6963ProviderDetail[] {
     if (typeof window === 'undefined') return [];
 
-    try {
-      window.dispatchEvent(new Event('eip6963:requestProvider'));
-    } catch (error) {
-      console.warn('Failed to request EIP-6963 wallet providers:', error);
+    if (shouldRequest) {
+      try {
+        window.dispatchEvent(new Event('eip6963:requestProvider'));
+      } catch (error) {
+        console.warn('Failed to request EIP-6963 wallet providers:', error);
+      }
     }
 
     return this.eip6963Providers;
@@ -579,8 +582,9 @@ export class WalletService {
   }
 
   // Detect available wallets
-  detectWallets(): WalletInfo[] {
+  detectWallets(options: { requestEip6963?: boolean } = {}): WalletInfo[] {
     const wallets: WalletInfo[] = [];
+    const shouldRequestEip6963 = options.requestEip6963 !== false;
 
     if (typeof window === 'undefined') {
       console.warn('Window is undefined, cannot detect wallets');
@@ -606,7 +610,7 @@ export class WalletService {
 
     const seenNames = new Set<string>();
     const seenProviders = new Set<any>();
-    for (const detail of this.requestEip6963Providers()) {
+    for (const detail of this.requestEip6963Providers(shouldRequestEip6963)) {
       const wallet = this.getEip6963WalletInfo(detail);
       if (wallet) this.addWalletIfAvailable(wallets, wallet, seenNames, seenProviders);
     }

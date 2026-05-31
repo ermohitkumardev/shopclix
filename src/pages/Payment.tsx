@@ -54,11 +54,16 @@ const getWalletType = (provider: any): string => {
   return 'web3';
 };
 
+const isLivePaymentModeValue = (paymentMode: unknown): boolean => {
+  const normalized = String(paymentMode ?? '').trim().toLowerCase();
+  return paymentMode === true || paymentMode === 1 || normalized === '1' || normalized === 'true' || normalized === 'live' || normalized === 'mainnet';
+};
+
 
 const Payment: React.FC = () => {
   // FIX: Access user object which contains hasActiveSubscription
   const { user, fetchUserData } = useAuth();
-  const { settings } = useAdmin();
+  const { settings, loading: settingsLoading } = useAdmin();
   const navigate = useNavigate();
   const location = useLocation();
   const notification = useNotification();
@@ -355,10 +360,14 @@ const Payment: React.FC = () => {
 		    }
 		  };
 
-		  const handleWalletConnect = async (provider: any) => {
-		    if (isConnecting) return; // Prevent double click
-		
-			    setIsConnecting(true);
+			  const handleWalletConnect = async (provider: any) => {
+			    if (isConnecting) return; // Prevent double click
+          if (settingsLoading) {
+            notification.showError('Please Wait', 'Payment settings are still loading. Please try again in a moment.');
+            return;
+          }
+			
+				    setIsConnecting(true);
 			    try {
 			      const wallet = await walletService.connectWallet(provider);
 
@@ -589,7 +598,7 @@ const Payment: React.FC = () => {
           p_currency: 'USDT',
           p_transaction_id: hash,
           p_gateway_response: {
-            blockchain: settings.paymentMode == '1' ? 'BSC Mainnet' : 'BSC Testnet',
+            blockchain: isLivePaymentModeValue(settings.paymentMode) ? 'BSC Mainnet' : 'BSC Testnet',
             usdt_contract: settings.usdtAddress,
             subscription_wallet: settings.subscriptionWalletAddress,
             transaction_hash: hash,
@@ -627,7 +636,7 @@ const Payment: React.FC = () => {
           amount: selectedPlan.tsp_price,
           transactionHash: hash,
           reservedUsed: reservedUsedRounded,
-          network: settings.paymentMode == '1' ? 'BSC Mainnet' : 'BSC Testnet',
+          network: isLivePaymentModeValue(settings.paymentMode) ? 'BSC Mainnet' : 'BSC Testnet',
         });
         notification.showSuccess('Payment Successful!', 'Upgrade has been activated (reserved + blockchain).');
         return;
@@ -735,7 +744,7 @@ const Payment: React.FC = () => {
           p_payment_status: 'completed',
           p_transaction_id: hash,
           p_gateway_response: {
-            blockchain: settings.paymentMode == '1' ? 'BSC Mainnet' : 'BSC Testnet',
+            blockchain: isLivePaymentModeValue(settings.paymentMode) ? 'BSC Mainnet' : 'BSC Testnet',
             contract_address: settings.subscriptionContractAddress,
             usdt_contract: settings.usdtAddress,
             subscription_wallet: settings.subscriptionWalletAddress,
@@ -770,7 +779,7 @@ const Payment: React.FC = () => {
           planName: selectedPlan.tsp_name,
           amount: selectedPlan.tsp_price,
           transactionHash: hash,
-          network: settings.paymentMode == '1' ? 'BSC Mainnet' : 'BSC Testnet',
+          network: isLivePaymentModeValue(settings.paymentMode) ? 'BSC Mainnet' : 'BSC Testnet',
         });
       }
 
@@ -808,7 +817,7 @@ const Payment: React.FC = () => {
               tp_transaction_id: transaction.hash,
               tp_error_message: errorMessage,
               tp_gateway_response: {
-                blockchain: settings.paymentMode == '1' ? 'BSC Mainnet' : 'BSC Testnet',
+                blockchain: isLivePaymentModeValue(settings.paymentMode) ? 'BSC Mainnet' : 'BSC Testnet',
                 contract_address: settings.subscriptionContractAddress,
                 usdt_contract: settings.usdtAddress,
                 subscription_wallet: settings.subscriptionWalletAddress,
@@ -939,10 +948,7 @@ const Payment: React.FC = () => {
               Secure blockchain payment processing
               {settings && (
                   <span className="ml-2 px-2 py-1 bg-purple-600/30 rounded-md text-sm">
-                {settings.paymentMode === true ||
-                settings.paymentMode === 1 ||
-                settings.paymentMode === '1' ||
-                settings.paymentMode === 'true'
+                {isLivePaymentModeValue(settings.paymentMode)
                   ? 'BSC Mainnet'
                   : 'BSC Testnet'}
               </span>
@@ -1028,21 +1034,21 @@ const Payment: React.FC = () => {
                               Last connected: {new Date(lastConnectedWallet.tuwc_last_connected_at).toLocaleDateString()}
                             </p>
                           </div>
-                          <button
-                              onClick={handleReconnectPreviousWallet}
-                              disabled={isConnecting}
-                              className="mt-3 w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg transition-colors"
-                          >
+	                          <button
+	                              onClick={handleReconnectPreviousWallet}
+	                              disabled={settingsLoading || isConnecting}
+	                              className="mt-3 w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg transition-colors"
+	                          >
                             {isConnecting ? 'Reconnecting...' : 'Reconnect Previous Wallet'}
                           </button>
                         </div>
                     )}
 
-	                    <WalletSelector
-	                        wallets={filteredWallets}
-	                        onConnect={handleWalletConnect}
-	                        isConnecting={isConnecting}
-	                    />
+		                    <WalletSelector
+		                        wallets={filteredWallets}
+		                        onConnect={handleWalletConnect}
+		                        isConnecting={settingsLoading || isConnecting}
+		                    />
 
                       {canUseReservedForUpgradeUi && !hasActivePlan && (
                         <div className="mt-6 bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20 shadow-xl">
