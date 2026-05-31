@@ -264,6 +264,17 @@ export class WalletService {
     return Number.parseInt(chainIdHex, 16);
   }
 
+  private parseWalletChainId(chainId: unknown): number | null {
+    if (typeof chainId === 'number' && Number.isFinite(chainId)) return chainId;
+    if (typeof chainId !== 'string') return null;
+    const normalized = chainId.trim().toLowerCase();
+    if (!normalized) return null;
+    const parsed = normalized.startsWith('0x')
+      ? Number.parseInt(normalized, 16)
+      : Number.parseInt(normalized, 10);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
   private async assertCorrectNetwork(): Promise<void> {
     if (!this.provider) {
       throw new Error('Provider not initialized');
@@ -815,7 +826,18 @@ export class WalletService {
       await new Promise(resolve => setTimeout(resolve, 100));
 
       const networkConfig = this.getNetworkConfig();
+      const expectedChainId = this.getExpectedChainId();
       console.log(`Switching to ${networkConfig.chainName}...`);
+
+      try {
+        const currentChainId = this.parseWalletChainId(await provider.request({ method: 'eth_chainId' }));
+        if (currentChainId === expectedChainId) {
+          console.log(`Wallet is already on ${networkConfig.chainName}`);
+          return;
+        }
+      } catch (chainReadError) {
+        console.warn('Could not read wallet chain before switching:', chainReadError);
+      }
 
       await provider.request({
         method: 'wallet_switchEthereumChain',
@@ -846,6 +868,14 @@ export class WalletService {
       } else if (switchError.code === 4001) {
         throw new Error('Network switch cancelled by user');
       } else {
+        const networkConfig = this.getNetworkConfig();
+        const message = String(switchError?.message || '').toLowerCase();
+        if (
+          networkConfig.chainId === BSC_TESTNET_CONFIG.chainId &&
+          (message.includes('not supported') || message.includes('unsupported'))
+        ) {
+          throw new Error('Bitget Wallet does not support switching to BSC Testnet from this dApp. If you already added BSC Testnet, select it manually inside Bitget and try again. Otherwise use TokenPocket/MetaMask for testnet or switch payment mode to Live/Mainnet.');
+        }
         throw new Error(`Failed to switch network: ${switchError.message}`);
       }
     }
