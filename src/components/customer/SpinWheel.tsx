@@ -286,7 +286,7 @@ const SpinWheel: React.FC = () => {
             </h3>
             <p className="mt-2 text-gray-600">
               {hasWon
-                ? `${Number(result.prizeAmount || 0).toFixed(2)} USDT has been credited to your working wallet.`
+                ? `${Number(result.prizeAmount || 0).toFixed(2)} USDT has been added to your reserved wallet for upgrade.`
                 : 'Your spin has been recorded.'}
             </p>
             <button

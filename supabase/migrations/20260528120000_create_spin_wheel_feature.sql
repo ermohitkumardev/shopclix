@@ -211,6 +211,7 @@ BEGIN
 
   UPDATE public.tbl_wallets
   SET tw_balance = COALESCE(tw_balance, 0) + v_spin.tsws_prize_amount,
+      tw_reserved_balance = COALESCE(tw_reserved_balance, 0) + v_spin.tsws_prize_amount,
       tw_updated_at = now()
   WHERE tw_id = v_wallet_id
   RETURNING tw_balance INTO v_new_balance;
@@ -233,7 +234,7 @@ BEGIN
     'credit',
     v_spin.tsws_prize_amount,
     'USDT',
-    'Spin wheel reward',
+    'Spin wheel reserved reward for upgrade',
     'spin_wheel_prize',
     v_spin.tsws_id,
     'completed',
@@ -391,7 +392,7 @@ BEGIN
     'outcome', v_outcome,
     'newBalance', v_new_balance,
     'message', CASE
-      WHEN v_prize_amount > 0 THEN 'Congratulations! Your spin reward has been credited to your working wallet.'
+      WHEN v_prize_amount > 0 THEN 'Congratulations! Your spin reward has been added to your reserved wallet for upgrade.'
       ELSE 'Better luck next time.'
     END
   );
