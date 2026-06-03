@@ -81,6 +81,10 @@ const SpinWheel: React.FC = () => {
       .join(', ')})`;
   }, [segments]);
 
+  const revealedResult = result || (status?.hasSpun ? status : null);
+  const revealedSegmentIndex = revealedResult ? findTargetIndex(segments, revealedResult) : -1;
+  const shouldRevealSegmentLabel = Boolean(revealedResult && !spinning);
+
   const loadStatus = async () => {
     try {
       setLoading(true);
@@ -174,12 +178,12 @@ const SpinWheel: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border border-gray-200 bg-white p-6">
+      <div className="overflow-hidden rounded-xl border border-teal-100 bg-gradient-to-br from-white via-slate-50 to-teal-50 p-6 shadow-sm">
         <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h3 className="text-xl font-bold text-gray-900">{status?.campaignName || 'Spin the Wheel'}</h3>
             <p className="text-sm text-gray-500">
-              {status?.hasSpun ? 'You have already used your spin.' : 'One spin is available for your account.'}
+              {status?.hasSpun ? 'You have already used your spin.' : 'One mystery spin is available for your account.'}
             </p>
           </div>
           <button
@@ -192,58 +196,91 @@ const SpinWheel: React.FC = () => {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 items-center gap-8 lg:grid-cols-[minmax(280px,420px)_1fr]">
-          <div className="relative mx-auto aspect-square w-full max-w-[420px]">
-            <div className="absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-1">
-              <div className="h-0 w-0 border-l-[16px] border-r-[16px] border-t-[34px] border-l-transparent border-r-transparent border-t-gray-900" />
-            </div>
-            <div
-              className="h-full w-full rounded-full border-[10px] border-gray-900 shadow-xl transition-transform duration-[4200ms] ease-out"
-              style={{ background: wheelGradient, transform: `rotate(${rotation}deg)` }}
-            >
-              <div className="relative h-full w-full">
-                {segments.map((segment, index) => {
-                  const angle = index * (360 / segments.length) + 360 / segments.length / 2;
-                  const radians = (angle * Math.PI) / 180;
-                  const left = 50 + Math.sin(radians) * 31;
-                  const top = 50 - Math.cos(radians) * 31;
-                  return (
-                    <div
-                      key={`${segment.label}-${index}`}
-                      className="absolute -translate-x-1/2 -translate-y-1/2"
-                      style={{
-                        left: `${left}%`,
-                        top: `${top}%`,
-                      }}
-                    >
-                      <span
-                        className="block w-16 rounded-full bg-black/25 px-1.5 py-1 text-center text-[8px] font-extrabold uppercase leading-tight text-white shadow-sm sm:w-20 sm:text-[10px]"
-                        style={{
-                          transform: `rotate(${-rotation}deg)`,
-                        }}
-                      >
-                        {segment.label}
-                      </span>
-                    </div>
-                  );
-                })}
+        <div className="grid grid-cols-1 items-center gap-8 lg:grid-cols-[minmax(280px,440px)_1fr]">
+          <div className="relative mx-auto aspect-square w-full max-w-[440px]">
+            <div className="absolute inset-6 rounded-full bg-teal-500/20 blur-3xl" />
+            <div className="absolute left-1/2 top-0 z-20 -translate-x-1/2 -translate-y-2">
+              <div className="rounded-b-full bg-white px-3 pb-2 pt-1 shadow-lg">
+                <div className="h-0 w-0 border-l-[18px] border-r-[18px] border-t-[38px] border-l-transparent border-r-transparent border-t-slate-950 drop-shadow-md" />
               </div>
             </div>
-            <div className="absolute left-1/2 top-1/2 flex h-20 w-20 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-4 border-white bg-gray-900 text-sm font-bold text-white shadow-lg">
-              SPIN
+            <div className="relative h-full w-full rounded-full bg-gradient-to-br from-slate-950 via-slate-800 to-slate-950 p-3 shadow-[0_28px_70px_rgba(15,23,42,0.28)]">
+              <div className="absolute inset-0 rounded-full border border-white/25" />
+              <div
+                className="relative h-full w-full overflow-hidden rounded-full border-[6px] border-slate-950 shadow-inner transition-transform duration-[4200ms] ease-out"
+                style={{ background: wheelGradient, transform: `rotate(${rotation}deg)` }}
+              >
+                <div
+                  className="absolute inset-0 rounded-full"
+                  style={{
+                    background:
+                      'radial-gradient(circle at 32% 26%, rgba(255,255,255,0.34), transparent 28%), radial-gradient(circle at center, transparent 0 54%, rgba(15,23,42,0.18) 74%, rgba(15,23,42,0.42) 100%)',
+                  }}
+                />
+                <div
+                  className="absolute inset-0 rounded-full"
+                  style={{
+                    background:
+                      'repeating-conic-gradient(from -22.5deg, transparent 0deg 44deg, rgba(255,255,255,0.55) 44deg 45deg)',
+                  }}
+                />
+                <div className="relative h-full w-full">
+                  {segments.map((segment, index) => {
+                    const angle = index * (360 / segments.length) + 360 / segments.length / 2;
+                    const radians = (angle * Math.PI) / 180;
+                    const left = 50 + Math.sin(radians) * 31;
+                    const top = 50 - Math.cos(radians) * 31;
+                    const revealThisSegment = shouldRevealSegmentLabel && index === revealedSegmentIndex;
+                    return (
+                      <div
+                        key={`${segment.label}-${index}`}
+                        className="absolute -translate-x-1/2 -translate-y-1/2"
+                        style={{
+                          left: `${left}%`,
+                          top: `${top}%`,
+                        }}
+                      >
+                        {revealThisSegment && (
+                          <span
+                            className="block w-20 rounded-full bg-slate-950/75 px-2 py-1.5 text-center text-[9px] font-extrabold uppercase leading-tight text-white shadow-lg ring-1 ring-white/25 sm:w-24 sm:text-xs"
+                            style={{
+                              transform: `rotate(${-rotation}deg)`,
+                            }}
+                          >
+                            {segment.label}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="absolute inset-[13%] rounded-full border border-white/20" />
+                <div className="absolute inset-[28%] rounded-full bg-white/10 blur-md" />
+              </div>
+            </div>
+            <div className="absolute left-1/2 top-1/2 flex h-24 w-24 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white p-1.5 shadow-[0_14px_35px_rgba(15,23,42,0.35)] sm:h-28 sm:w-28">
+              <button
+                type="button"
+                onClick={handleSpin}
+                disabled={spinning || status?.hasSpun || !status?.active}
+                className="flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br from-slate-950 via-slate-900 to-teal-950 text-sm font-black uppercase tracking-wide text-white shadow-inner transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:hover:scale-100 sm:text-base"
+                aria-label="Spin wheel"
+              >
+                {spinning ? 'Spin' : shouldRevealSegmentLabel ? 'Done' : 'Spin'}
+              </button>
             </div>
           </div>
 
           <div className="space-y-5">
-            <div className="rounded-lg border border-teal-100 bg-teal-50 p-5">
-              <p className="text-sm font-medium text-teal-800">Spin Rule</p>
+            <div className="rounded-lg border border-teal-100 bg-white/80 p-5 shadow-sm">
+              <p className="text-sm font-semibold text-teal-900">Mystery Spin</p>
               <p className="mt-1 text-sm text-teal-700">
-                Each customer can spin only once. The result is saved permanently after the wheel stops.
+                Each customer can spin only once. The reward or better-luck message is revealed only after the wheel stops.
               </p>
             </div>
 
             {status?.hasSpun ? (
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-5">
+              <div className="rounded-lg border border-gray-200 bg-white/80 p-5 shadow-sm">
                 <p className="font-semibold text-gray-900">You have already used your spin.</p>
                 <p className="mt-1 text-sm text-gray-600">
                   {Number(status.prizeAmount || 0) > 0
