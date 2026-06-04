@@ -81,10 +81,6 @@ const SpinWheel: React.FC = () => {
       .join(', ')})`;
   }, [segments]);
 
-  const revealedResult = result || (status?.hasSpun ? status : null);
-  const revealedSegmentIndex = revealedResult ? findTargetIndex(segments, revealedResult) : -1;
-  const shouldRevealSegmentLabel = Boolean(revealedResult && !spinning);
-
   const loadStatus = async () => {
     try {
       setLoading(true);
@@ -183,7 +179,7 @@ const SpinWheel: React.FC = () => {
           <div>
             <h3 className="text-xl font-bold text-gray-900">{status?.campaignName || 'Spin the Wheel'}</h3>
             <p className="text-sm text-gray-500">
-              {status?.hasSpun ? 'You have already used your spin.' : 'One mystery spin is available for your account.'}
+              {status?.hasSpun ? 'You have already used your spin.' : 'One spin is available for your account.'}
             </p>
           </div>
           <button
@@ -230,7 +226,6 @@ const SpinWheel: React.FC = () => {
                     const radians = (angle * Math.PI) / 180;
                     const left = 50 + Math.sin(radians) * 31;
                     const top = 50 - Math.cos(radians) * 31;
-                    const revealThisSegment = shouldRevealSegmentLabel && index === revealedSegmentIndex;
                     return (
                       <div
                         key={`${segment.label}-${index}`}
@@ -240,16 +235,14 @@ const SpinWheel: React.FC = () => {
                           top: `${top}%`,
                         }}
                       >
-                        {revealThisSegment && (
-                          <span
-                            className="block w-20 rounded-full bg-slate-950/75 px-2 py-1.5 text-center text-[9px] font-extrabold uppercase leading-tight text-white shadow-lg ring-1 ring-white/25 sm:w-24 sm:text-xs"
-                            style={{
-                              transform: `rotate(${-rotation}deg)`,
-                            }}
-                          >
-                            {segment.label}
-                          </span>
-                        )}
+                        <span
+                          className="block w-20 rounded-full bg-slate-950/75 px-2 py-1.5 text-center text-[9px] font-extrabold uppercase leading-tight text-white shadow-lg ring-1 ring-white/25 sm:w-24 sm:text-xs"
+                          style={{
+                            transform: `rotate(${-rotation}deg)`,
+                          }}
+                        >
+                          {segment.label}
+                        </span>
                       </div>
                     );
                   })}
@@ -266,16 +259,16 @@ const SpinWheel: React.FC = () => {
                 className="flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br from-slate-950 via-slate-900 to-teal-950 text-sm font-black uppercase tracking-wide text-white shadow-inner transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:hover:scale-100 sm:text-base"
                 aria-label="Spin wheel"
               >
-                {spinning ? 'Spin' : shouldRevealSegmentLabel ? 'Done' : 'Spin'}
+                Spin
               </button>
             </div>
           </div>
 
           <div className="space-y-5">
             <div className="rounded-lg border border-teal-100 bg-white/80 p-5 shadow-sm">
-              <p className="text-sm font-semibold text-teal-900">Mystery Spin</p>
+              <p className="text-sm font-semibold text-teal-900">Spin Rule</p>
               <p className="mt-1 text-sm text-teal-700">
-                Each customer can spin only once. The reward or better-luck message is revealed only after the wheel stops.
+                Each customer can spin only once. The result is saved permanently after the wheel stops.
               </p>
             </div>
 
