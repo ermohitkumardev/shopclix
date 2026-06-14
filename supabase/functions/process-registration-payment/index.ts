@@ -467,6 +467,7 @@ Deno.serve(async (req: Request) => {
           const { count, error: countError } = await supabase
             .from('tbl_wallet_transactions')
             .select('twt_id', { count: 'exact', head: true })
+            .eq('twt_user_id', userId)
             .eq('twt_reference_id', referenceId)
             .eq('twt_reference_type', referenceType);
 
@@ -491,6 +492,10 @@ Deno.serve(async (req: Request) => {
               twt_reference_type: referenceType,
               twt_reference_id: referenceId
             });
+
+          if (insertError?.code === '23505') {
+            return 0;
+          }
 
           if (insertError) {
             console.error('Failed to insert wallet transaction:', insertError);

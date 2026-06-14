@@ -791,6 +791,10 @@ Deno.serve(async (req: Request) => {
               twt_reference_id: referenceId
             });
 
+          if (insertError?.code === '23505') {
+            return 0;
+          }
+
           if (insertError) {
             console.error('Failed to insert wallet transaction:', insertError);
             return 0;
